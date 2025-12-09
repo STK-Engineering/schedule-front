@@ -1,20 +1,30 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { View, SafeAreaView } from 'react-native';
+import Sidebar from './src/components/Sidebar';
+import Calendar from "./src/pages/Calendar";
 
-export default function App() {
+const Stack = createStackNavigator();
+
+function MainNavigator() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Calendar" component={Calendar} />
+    </Stack.Navigator>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <NavigationContainer>
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', flex: 1 }}>
+          <Sidebar />
+          <View style={{ flex: 1 }}>
+            <MainNavigator />
+          </View>
+        </View>
+      </SafeAreaView>
+    </NavigationContainer>
+  );
+}

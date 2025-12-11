@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, Button } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
+import { navigate } from "../navigation/RootNavigation";
 import { useNavigation } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
 
@@ -9,39 +10,60 @@ export default function Sidebar() {
     <View
       style={{
         width: 350,
-        backgroundColor: "#bebebeff",
+        backgroundColor: "#white",
+        borderRightWidth: 1,
+        borderColor: "#D4D4D4",
         paddingVertical: 20,
         alignItems: "center",
-        gap: 30
+        gap: 30,
       }}
     >
       {/* 버튼 */}
-      <TouchableOpacity
-        onPress={() => navigation.navigate("Calendar")}
+      <View
         style={{
-          backgroundColor: "#305685",
-          paddingVertical: 17,
-          paddingHorizontal: 60,
-          borderRadius: 10,
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
-        <View style={{ display: "flex", flexDirection: "row", gap: 10 }}>
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#305685",
+            paddingVertical: 17,
+            paddingHorizontal: 40,
+            borderTopLeftRadius: 10,
+            borderBottomLeftRadius: 10,
+          }}
+          onPress={() => navigation.navigate("Content")}
+        >
           <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
             연차 쓰기
           </Text>
-          <View
-            style={{
-              width: 1,
-              backgroundColor: "#ccc",
-              height: "100%",
-              marginHorizontal: 10,
-            }}
-          />
+        </TouchableOpacity>
+        <View
+          style={{
+            width: 1,
+            backgroundColor: "#ccc",
+            height: "50%",
+            position: "absolute",
+          }}
+        />
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#305685",
+            paddingVertical: 17,
+            paddingHorizontal: 40,
+            borderTopRightRadius: 10,
+            borderBottomRightRadius: 10,
+          }}
+          onPress={() => navigate("Status")}
+        >
           <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
             진행 상황
           </Text>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
 
       {/* 달력 */}
       <View
@@ -80,7 +102,7 @@ export default function Sidebar() {
             backgroundColor: "white",
             padding: 1,
             paddingHorizontal: 10,
-            paddingVertical: 18,
+            paddingVertical: 15,
             borderBottomLeftRadius: 10,
             borderBottomRightRadius: 10,
             flexDirection: "row",
@@ -88,15 +110,16 @@ export default function Sidebar() {
             justifyContent: "center",
             backgroundColor: "white",
             borderWidth: 1,
-            borderColor: "#E2E8F0"
+            borderColor: "#E2E8F0",
           }}
         >
           <View
             style={{
               flexDirection: "column",
               justifyContent: "space-between",
-              marginBottom: 5,
               alignItems: "center",
+              display: "flex",
+              gap: 5,
             }}
           >
             <Text>총 연차</Text>
@@ -113,8 +136,9 @@ export default function Sidebar() {
             style={{
               flexDirection: "column",
               justifyContent: "space-between",
-              marginBottom: 5,
               alignItems: "center",
+              display: "flex",
+              gap: 5,
             }}
           >
             <Text>사용 일수</Text>
@@ -131,8 +155,9 @@ export default function Sidebar() {
             style={{
               flexDirection: "column",
               justifyContent: "space-between",
-              marginBottom: 5,
               alignItems: "center",
+              display: "flex",
+              gap: 5,
             }}
           >
             <Text>잔여 일수</Text>

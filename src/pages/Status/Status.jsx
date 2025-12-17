@@ -1,8 +1,10 @@
 import React from "react";
 import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import pdf from "../../../assets/img/pdf.png";
 
 export default function Status() {
+  
   const statusList = [
     {
       id: 1,
@@ -22,7 +24,7 @@ export default function Status() {
     },
     {
       id: 3,
-      type: "병가",
+      type: "연차",
       date: "2025.11.29",
       days: "1일",
       file: pdf,
@@ -103,8 +105,10 @@ export default function Status() {
 }
 
 function Item({ item }) {
+  const navigation = useNavigation();
+
   return (
-    <View
+    <TouchableOpacity
       style={{
         width: "85%",
         backgroundColor: "#fff",
@@ -119,7 +123,9 @@ function Item({ item }) {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+        cursor: "pointer"
       }}
+      onPress={() => navigation.navigate("Content")}
     >
       <Text style={{ fontSize: 20, fontWeight: "500", width: 100 }}>
         {item.type}
@@ -165,6 +171,6 @@ function Item({ item }) {
           }}
         />
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }

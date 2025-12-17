@@ -1,5 +1,4 @@
 import { View, Text, TouchableOpacity } from "react-native";
-import { navigate } from "../navigation/RootNavigation";
 import { useNavigation } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
 
@@ -10,7 +9,7 @@ export default function Sidebar() {
     <View
       style={{
         width: 350,
-        backgroundColor: "#white",
+        backgroundColor: "white",
         borderRightWidth: 1,
         borderColor: "#D4D4D4",
         paddingVertical: 20,
@@ -21,10 +20,10 @@ export default function Sidebar() {
       {/* 버튼 */}
       <View
         style={{
-          display: "flex",
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
+          position: "relative",
         }}
       >
         <TouchableOpacity
@@ -35,20 +34,22 @@ export default function Sidebar() {
             borderTopLeftRadius: 10,
             borderBottomLeftRadius: 10,
           }}
-          onPress={() => navigation.navigate("Content")}
+          onPress={() => navigation.navigate("Form")}
         >
           <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
             연차 쓰기
           </Text>
         </TouchableOpacity>
+
         <View
           style={{
             width: 1,
             backgroundColor: "#ccc",
-            height: "50%",
+            height: 40, 
             position: "absolute",
           }}
         />
+
         <TouchableOpacity
           style={{
             backgroundColor: "#305685",
@@ -57,7 +58,7 @@ export default function Sidebar() {
             borderTopRightRadius: 10,
             borderBottomRightRadius: 10,
           }}
-          onPress={() => navigate("Status")}
+          onPress={() => navigation.navigate("Status")}
         >
           <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
             진행 상황
@@ -73,11 +74,11 @@ export default function Sidebar() {
           borderRadius: 20,
           borderWidth: 1,
           borderColor: "#E2E8F0",
+          backgroundColor: "white",
           overflow: "hidden",
-          backgroundColor: "#fff",
         }}
       >
-        <Calendar />
+        <Calendar style={{ height: 350 }} />
       </View>
 
       {/* 연차 조회 */}
@@ -97,34 +98,26 @@ export default function Sidebar() {
             연차 조회
           </Text>
         </View>
+
         <View
           style={{
             backgroundColor: "white",
-            padding: 1,
-            paddingHorizontal: 10,
             paddingVertical: 15,
+            paddingHorizontal: 10,
             borderBottomLeftRadius: 10,
             borderBottomRightRadius: 10,
             flexDirection: "row",
             gap: 23,
             justifyContent: "center",
-            backgroundColor: "white",
             borderWidth: 1,
             borderColor: "#E2E8F0",
           }}
         >
-          <View
-            style={{
-              flexDirection: "column",
-              justifyContent: "space-between",
-              alignItems: "center",
-              display: "flex",
-              gap: 5,
-            }}
-          >
+          <View style={{ alignItems: "center", gap: 5 }}>
             <Text>총 연차</Text>
             <Text style={{ fontSize: 20 }}>15일</Text>
           </View>
+
           <View
             style={{
               width: 1,
@@ -132,18 +125,12 @@ export default function Sidebar() {
               height: "100%",
             }}
           />
-          <View
-            style={{
-              flexDirection: "column",
-              justifyContent: "space-between",
-              alignItems: "center",
-              display: "flex",
-              gap: 5,
-            }}
-          >
+
+          <View style={{ alignItems: "center", gap: 5 }}>
             <Text>사용 일수</Text>
             <Text style={{ fontSize: 20 }}>10일</Text>
           </View>
+
           <View
             style={{
               width: 1,
@@ -151,15 +138,8 @@ export default function Sidebar() {
               height: "100%",
             }}
           />
-          <View
-            style={{
-              flexDirection: "column",
-              justifyContent: "space-between",
-              alignItems: "center",
-              display: "flex",
-              gap: 5,
-            }}
-          >
+
+          <View style={{ alignItems: "center", gap: 5 }}>
             <Text>잔여 일수</Text>
             <Text style={{ fontSize: 20 }}>5일</Text>
           </View>

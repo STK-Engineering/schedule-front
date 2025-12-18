@@ -15,6 +15,7 @@ import Change from "./src/pages/Change";
 import Request from "./src/pages/Request/Request";
 import StatusContent from "./src/pages/Status/Content";
 import RequestContent from "./src/pages/Request/Content";
+import Setting from "./src/pages/Setting"
 
 const Stack = createStackNavigator();
 
@@ -69,6 +70,11 @@ function MainNavigator() {
       <Stack.Screen
         name="Request"
         component={Request}
+        options={{ sidebarDisabled: false }}
+      />
+      <Stack.Screen
+        name="Setting"
+        component={Setting}
         options={{ sidebarDisabled: false }}
       />
     </Stack.Navigator>

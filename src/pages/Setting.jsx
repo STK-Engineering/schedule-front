@@ -6,6 +6,8 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Modal,
+  TextInput,
 } from "react-native";
 
 const columns = [
@@ -15,7 +17,7 @@ const columns = [
   { key: "date", title: "입사일", width: 160, sortable: true },
   { key: "mail", title: "메일", width: 182, sortable: true },
   { key: "approver", title: "결재자", width: 120, sortable: true },
-  { key: "auth", title: "권한", width: 160, sortable: true }
+  { key: "auth", title: "권한", width: 160, sortable: true },
 ];
 
 const initialData = [
@@ -71,10 +73,11 @@ const initialData = [
   },
 ];
 
-export default function DataTableScreen() {
+export default function Setting() {
   const [data, setData] = useState(initialData);
   const [selectedIds, setSelectedIds] = useState([]);
   const [sort, setSort] = useState({ key: null, direction: "asc" });
+  const [modalVisible, setModalVisible] = useState(false);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
@@ -172,6 +175,7 @@ export default function DataTableScreen() {
             paddingVertical: 10,
             paddingHorizontal: 45,
           }}
+          onPress={() => setModalVisible(true)}
         >
           <Text
             style={{ color: "white", textAlign: "center", fontWeight: 500 }}
@@ -195,7 +199,47 @@ export default function DataTableScreen() {
           />
         </View>
       </ScrollView>
+      <Modal
+  visible={modalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalBox}>
+      <Text style={styles.modalTitle}>계정 추가</Text>
+
+      <TextInput style={styles.input} placeholder="이름" />
+      <TextInput style={styles.input} placeholder="부서" />
+      <TextInput style={styles.input} placeholder="직급" />
+      <TextInput style={styles.input} placeholder="입사일" />
+      <TextInput style={styles.input} placeholder="메일" />
+      <TextInput style={styles.input} placeholder="결재자" />
+      <TextInput style={styles.input} placeholder="권한" />
+
+      <View style={styles.modalButtonRow}>
+        <TouchableOpacity
+          style={[styles.modalButton, styles.confirmButton]}
+          onPress={() => setModalVisible(false)}
+        >
+          <Text style={styles.confirmText}>수정</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.modalButton, styles.cancelButton]}
+          onPress={() => {
+            setModalVisible(false);
+          }}
+        >
+          <Text style={styles.cancelText}>취소</Text>
+        </TouchableOpacity>
+      </View>
     </View>
+  </View>
+</Modal>
+
+    </View>
+    
   );
 }
 
@@ -269,4 +313,68 @@ const styles = StyleSheet.create({
     color: "#666",
     fontWeight: "500",
   },
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.4)",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+modalBox: {
+  width: 340,
+  backgroundColor: "#FFF",
+  borderRadius: 16,
+  padding: 20,
+},
+
+modalTitle: {
+  fontSize: 18,
+  fontWeight: "700",
+  marginBottom: 16,
+},
+
+input: {
+  borderWidth: 1,
+  borderColor: "#DDD",
+  borderRadius: 8,
+  padding: 12,
+  marginBottom: 10,
+},
+
+modalButtonRow: {
+  flexDirection: "row",
+  justifyContent: "flex-end",
+  marginTop: 20,
+},
+
+modalButton: {
+  paddingVertical: 10,
+  paddingHorizontal: 20,
+  borderRadius: 8,
+  marginLeft: 10,
+},
+
+cancelButton: {
+  borderWidth: 1,
+  borderColor: "#305685",
+  width: "48%",
+},
+
+confirmButton: {
+  backgroundColor: "#305685",
+  width: "48%",
+},
+
+cancelText: {
+  color: "#305685",
+  fontWeight: "600",
+  textAlign: "center"
+},
+
+confirmText: {
+  color: "#FFF",
+  fontWeight: "600",
+  textAlign: "center"
+},
+
 });

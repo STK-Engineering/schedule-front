@@ -88,7 +88,7 @@ export default function Login() {
         <TouchableOpacity
           style={{
             backgroundColor: "#121D6D",
-            paddingHorizontal: "45%",
+            width: "100%",
             borderWidth: 1,
             borderColor: "#121D6D",
             paddingVertical: 16,
@@ -100,28 +100,33 @@ export default function Login() {
 
         <View
           style={{
-            marginTop: 40,
+            marginTop: 35,
             display: "flex",
             flexDirection: "row",
-            gap: 20,
+            gap: 30,
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 16 }}>아직 회원이 아니신가요?</Text>
           <TouchableOpacity
             style={{
-              borderWidth: 1,
-              borderColor: "#121D6D",
-              paddingHorizontal: 45,
-              paddingVertical: 10,
-              borderRadius: 12,
+              color: "#121D6D",
               display: "flex",
               justifyContent: "center",
-              alignItems: "center",
+              alignItems: "center"
             }}
             onPress={() => navigation.navigate("SignUp")}
-          >
-            <Text style={{ color: "#121D6D" }}>회원가입</Text>
+          >비밀번호 찾기
+          </TouchableOpacity>
+          <View style={{ height: "100%", width: 1, backgroundColor: "#A5A5A5"}}/>
+           <TouchableOpacity
+            style={{
+              color: "#121D6D",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center"
+            }}
+            onPress={() => navigation.navigate("SignUp")}
+          >회원가입
           </TouchableOpacity>
         </View>
       </View>

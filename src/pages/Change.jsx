@@ -118,28 +118,26 @@ export default function Change() {
         >
           <TouchableOpacity
             style={{
-              color: "#121D6D",
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
             }}
-            onPress={() => navigation.navigate("Password")}
+            onPress={() => navigation.navigate("Find")}
           >
-            비밀번호 찾기
+            <Text style={{ color: "#121D6D", fontSize: 16 }}>비밀번호 찾기</Text>
           </TouchableOpacity>
           <View
             style={{ height: "100%", width: 1, backgroundColor: "#A5A5A5" }}
           />
           <TouchableOpacity
             style={{
-              color: "#121D6D",
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
             }}
             onPress={() => navigation.navigate("SignUp")}
           >
-            회원가입
+            <Text style={{ color: "#121D6D", fontSize: 16 }}>회원가입</Text>
           </TouchableOpacity>
         </View>
       </View>

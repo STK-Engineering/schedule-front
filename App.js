@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { View, SafeAreaView, Platform, Dimensions } from "react-native";
@@ -11,20 +12,52 @@ import Content from "./src/pages/Status/Content";
 import Form from "./src/pages/Form";
 import SignUp from "./src/pages/SignUp";
 import Find from "./src/pages/Find";
-import Change from "./src/pages/Change"
+import Change from "./src/pages/Change";
 const Stack = createStackNavigator();
 
 function MainNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Find" component={Find} />
-      <Stack.Screen name="Change" component={Change} />
-      <Stack.Screen name="Login" component={Login} />
-      <Stack.Screen name="SignUp" component={SignUp} />
-      <Stack.Screen name="Schedule" component={Schedule} />
-      <Stack.Screen name="Status" component={Status} />
-      <Stack.Screen name="Content" component={Content} />
-      <Stack.Screen name="Form" component={Form} />
+      <Stack.Screen
+        name="Find"
+        component={Find}
+        options={{ sidebarDisabled: true }}
+      />
+      <Stack.Screen
+        name="Change"
+        component={Change}
+        options={{ sidebarDisabled: true }}
+      />
+      <Stack.Screen
+        name="Login"
+        component={Login}
+        options={{ sidebarDisabled: true }}
+      />
+      <Stack.Screen
+        name="SignUp"
+        component={SignUp}
+        options={{ sidebarDisabled: true }}
+      />
+      <Stack.Screen
+        name="Schedule"
+        component={Schedule}
+        options={{ sidebarDisabled: false }}
+      />
+      <Stack.Screen
+        name="Status"
+        component={Status}
+        options={{ sidebarDisabled: false }}
+      />
+      <Stack.Screen
+        name="Content"
+        component={Content}
+        options={{ sidebarDisabled: false }}
+      />
+      <Stack.Screen
+        name="Form"
+        component={Form}
+        options={{ sidebarDisabled: false }}
+      />
     </Stack.Navigator>
   );
 }
@@ -34,15 +67,39 @@ export default function App() {
 
   const isDesktop = Platform.OS === "web" && width >= 900;
 
+  const [isSidebarDisabled, setIsSidebarDisabled] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = navigationRef.current?.addListener("state", () => {
+      const route = navigationRef.current.getCurrentRoute();
+      const options =
+        navigationRef.current.getCurrentOptions?.() || route?.params || {};
+
+      setIsSidebarDisabled(options.sidebarDisabled === true);
+    });
+
+    return unsubscribe;
+  }, []);
+
   return (
     <NavigationContainer ref={navigationRef}>
       <SafeAreaView style={{ flex: 1 }}>
         <Header />
 
         <View style={{ flex: 1, flexDirection: "row" }}>
-          
           {isDesktop && (
-            <View style={{ width: 350 }}>
+            <View style={{ width: 350, position: "relative" }}>
+              {isSidebarDisabled && (
+                <View
+                  style={{
+                    position: "absolute",
+                    backgroundColor: "rgba(255, 255, 255, 0.59)",
+                    zIndex: 1000,
+                    height: "100%",
+                    width: "100%",
+                  }}
+                />
+              )}
               <Sidebar />
             </View>
           )}

@@ -9,19 +9,18 @@ export default function Header() {
     <View
       style={{
         paddingTop: Platform.OS === "ios" ? 50 : 20,
-        height: Platform.OS === "ios" ? 110 : 90,
+        height: Platform.OS === "ios" ? 100 : 60,
         backgroundColor: "#305685",
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
         paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderColor: "#ddd",
+        paddingVertical: 20
       }}
     >
       <Image
         source={Logo}
-        style={{ height: 40, width: 160, resizeMode: "contain" }}
+        style={{ height: 30, width: 160, resizeMode: "contain" }}
       />
 
       <TouchableOpacity onPress={() => navigation.navigate("Login")}>

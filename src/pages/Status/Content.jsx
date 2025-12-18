@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
-export default function RequestDetail({ route }) {
+export default function StatusDetail({ route }) {
   const navigation = useNavigation();
   const params = route?.params ?? {};
 

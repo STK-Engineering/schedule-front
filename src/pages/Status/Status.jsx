@@ -125,7 +125,7 @@ function Item({ item }) {
         alignItems: "center",
         cursor: "pointer"
       }}
-      onPress={() => navigation.navigate("Content")}
+      onPress={() => navigation.navigate("StatusContent")}
     >
       <Text style={{ fontSize: 20, fontWeight: "500", width: 100 }}>
         {item.type}

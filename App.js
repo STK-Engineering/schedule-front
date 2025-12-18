@@ -8,11 +8,14 @@ import Sidebar from "./src/components/Sidebar";
 import Header from "./src/components/Header";
 import Schedule from "./src/pages/Schedule";
 import Status from "./src/pages/Status/Status";
-import Content from "./src/pages/Status/Content";
 import Form from "./src/pages/Form";
 import SignUp from "./src/pages/SignUp";
 import Find from "./src/pages/Find";
 import Change from "./src/pages/Change";
+import Request from "./src/pages/Request/Request";
+import StatusContent from "./src/pages/Status/Content";
+import RequestContent from "./src/pages/Request/Content";
+
 const Stack = createStackNavigator();
 
 function MainNavigator() {
@@ -49,13 +52,23 @@ function MainNavigator() {
         options={{ sidebarDisabled: false }}
       />
       <Stack.Screen
-        name="Content"
-        component={Content}
+        name="StatusContent"
+        component={StatusContent}
+        options={{ sidebarDisabled: false }}
+      />
+      <Stack.Screen
+        name="RequestContent"
+        component={RequestContent}
         options={{ sidebarDisabled: false }}
       />
       <Stack.Screen
         name="Form"
         component={Form}
+        options={{ sidebarDisabled: false }}
+      />
+      <Stack.Screen
+        name="Request"
+        component={Request}
         options={{ sidebarDisabled: false }}
       />
     </Stack.Navigator>

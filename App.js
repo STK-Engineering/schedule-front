@@ -2,17 +2,25 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { View, SafeAreaView, Platform, Dimensions } from "react-native";
 import { navigationRef } from "./src/navigation/RootNavigation";
+import Login from "./src/pages/Login";
 import Sidebar from "./src/components/Sidebar";
 import Header from "./src/components/Header";
 import Schedule from "./src/pages/Schedule";
 import Status from "./src/pages/Status/Status";
 import Content from "./src/pages/Status/Content";
 import Form from "./src/pages/Form";
+import SignUp from "./src/pages/SignUp";
+import Find from "./src/pages/Find";
+import Change from "./src/pages/Change"
 const Stack = createStackNavigator();
 
 function MainNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Find" component={Find} />
+      <Stack.Screen name="Change" component={Change} />
+      <Stack.Screen name="Login" component={Login} />
+      <Stack.Screen name="SignUp" component={SignUp} />
       <Stack.Screen name="Schedule" component={Schedule} />
       <Stack.Screen name="Status" component={Status} />
       <Stack.Screen name="Content" component={Content} />

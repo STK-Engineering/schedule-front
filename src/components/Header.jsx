@@ -1,7 +1,10 @@
 import { View, Image, Text, TouchableOpacity, Platform } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import Logo from "../../assets/logo/logo.png";
 
 export default function Header() {
+  const navigation = useNavigation();
+
   return (
     <View
       style={{
@@ -21,7 +24,7 @@ export default function Header() {
         style={{ height: 40, width: 160, resizeMode: "contain" }}
       />
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => navigation.navigate("Login")}>
         <Text style={{ fontSize: 18, fontWeight: "400", color: "white" }}>
           로그인
         </Text>

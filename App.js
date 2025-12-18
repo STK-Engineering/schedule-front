@@ -16,6 +16,7 @@ import Request from "./src/pages/Request/Request";
 import StatusContent from "./src/pages/Status/Content";
 import RequestContent from "./src/pages/Request/Content";
 import Setting from "./src/pages/Setting"
+import Application from "./src/pages/Application"
 
 const Stack = createStackNavigator();
 
@@ -75,6 +76,11 @@ function MainNavigator() {
       <Stack.Screen
         name="Setting"
         component={Setting}
+        options={{ sidebarDisabled: false }}
+      />
+      <Stack.Screen
+        name="Application"
+        component={Application}
         options={{ sidebarDisabled: false }}
       />
     </Stack.Navigator>

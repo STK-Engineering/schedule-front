@@ -13,11 +13,10 @@ import {
 const columns = [
   { key: "name", title: "이름", width: 120, sortable: true },
   { key: "department", title: "부서", width: 140, sortable: true },
-  { key: "position", title: "직급", width: 100, sortable: true },
-  { key: "date", title: "입사일", width: 160, sortable: true },
-  { key: "mail", title: "메일", width: 182, sortable: true },
-  { key: "approver", title: "결재자", width: 120, sortable: true },
-  { key: "auth", title: "권한", width: 160, sortable: true },
+  { key: "type", title: "유형", width: 90, sortable: true },
+  { key: "date", title: "사용일자", width: 200, sortable: true },
+  { key: "reason", title: "사유", width: 200, sortable: true },
+  { key: "etc", title: "기타사항", width: 232, sortable: true },
 ];
 
 const initialData = [
@@ -25,55 +24,68 @@ const initialData = [
     id: 1,
     name: "이지우",
     department: "IT/ISO",
-    position: "사원",
+    type: "연차",
     date: "2025-01-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
+    reason: "가족 여행",
+    etc: "싱가포르",
   },
   {
     id: 2,
     name: "이지우",
     department: "IT/ISO",
-    position: "사원",
-    date: "2025-05-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
+    type: "연차",
+    date: "2025-01-12",
+    reason: "가족 여행",
+    etc: "싱가포르",
   },
   {
     id: 3,
-    name: "김세진",
+    name: "이지우",
     department: "IT/ISO",
-    position: "사원",
+    type: "연차",
     date: "2025-01-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
+    reason: "가족 여행",
+    etc: "싱가포르",
   },
   {
     id: 4,
     name: "이지우",
     department: "IT/ISO",
-    position: "사원",
-    date: "2025-03-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
+    type: "연차",
+    date: "2025-01-12",
+    reason: "가족 여행",
+    etc: "싱가포르",
   },
   {
     id: 5,
     name: "이지우",
     department: "IT/ISO",
-    position: "사원",
+    type: "연차",
     date: "2025-02-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
+    reason: "가족 여행",
+    etc: "싱가포르",
+  },
+  {
+    id: 6,
+    name: "이지우",
+    department: "IT/ISO",
+    type: "연차",
+    date: "2025-08-12",
+    reason: "가족 여행",
+    etc: "싱가포르",
+  },
+  {
+    id: 7,
+    name: "이지우",
+    department: "IT/ISO",
+    type: "연차",
+    date: "2025-05-12",
+    reason: "가족 여행",
+    etc: "싱가포르",
   },
 ];
 
-export default function Setting() {
+export default function Application() {
   const [data, setData] = useState(initialData);
   const [selectedIds, setSelectedIds] = useState([]);
   const [sort, setSort] = useState({ key: null, direction: "asc" });
@@ -156,34 +168,7 @@ export default function Setting() {
 
   return (
     <View style={styles.container}>
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 30,
-        }}
-      >
-        <Text style={styles.title}>직원 수({data.length})</Text>
-        <TouchableOpacity
-          style={{
-            backgroundColor: "#305685",
-            borderWidth: 1,
-            borderColor: "#305685",
-            borderRadius: 12,
-            paddingVertical: 10,
-            paddingHorizontal: 45,
-          }}
-          onPress={() => setModalVisible(true)}
-        >
-          <Text
-            style={{ color: "white", textAlign: "center", fontWeight: 500 }}
-          >
-            계정 추가
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.title}>휴가 신청 목록({data.length})</Text>
 
       <ScrollView horizontal>
         <View>
@@ -200,46 +185,44 @@ export default function Setting() {
         </View>
       </ScrollView>
       <Modal
-  visible={modalVisible}
-  transparent
-  animationType="fade"
-  onRequestClose={() => setModalVisible(false)}
->
-  <View style={styles.modalOverlay}>
-    <View style={styles.modalBox}>
-      <Text style={styles.modalTitle}>계정 추가</Text>
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>계정 추가</Text>
 
-      <TextInput style={styles.input} placeholder="이름" />
-      <TextInput style={styles.input} placeholder="부서" />
-      <TextInput style={styles.input} placeholder="직급" />
-      <TextInput style={styles.input} placeholder="입사일" />
-      <TextInput style={styles.input} placeholder="메일" />
-      <TextInput style={styles.input} placeholder="결재자" />
-      <TextInput style={styles.input} placeholder="권한" />
+            <TextInput style={styles.input} placeholder="이름" />
+            <TextInput style={styles.input} placeholder="부서" />
+            <TextInput style={styles.input} placeholder="직급" />
+            <TextInput style={styles.input} placeholder="입사일" />
+            <TextInput style={styles.input} placeholder="메일" />
+            <TextInput style={styles.input} placeholder="결재자" />
+            <TextInput style={styles.input} placeholder="권한" />
 
-      <View style={styles.modalButtonRow}>
-        <TouchableOpacity
-          style={[styles.modalButton, styles.confirmButton]}
-          onPress={() => setModalVisible(false)}
-        >
-          <Text style={styles.confirmText}>수정</Text>
-        </TouchableOpacity>
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.confirmText}>수정</Text>
+              </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.modalButton, styles.cancelButton]}
-          onPress={() => {
-            setModalVisible(false);
-          }}
-        >
-          <Text style={styles.cancelText}>취소</Text>
-        </TouchableOpacity>
-      </View>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setModalVisible(false);
+                }}
+              >
+                <Text style={styles.cancelText}>취소</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
-  </View>
-</Modal>
-
-    </View>
-    
   );
 }
 
@@ -314,67 +297,66 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   modalOverlay: {
-  flex: 1,
-  backgroundColor: "rgba(0,0,0,0.4)",
-  justifyContent: "center",
-  alignItems: "center",
-},
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
-modalBox: {
-  width: 340,
-  backgroundColor: "#FFF",
-  borderRadius: 16,
-  padding: 20,
-},
+  modalBox: {
+    width: 340,
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 20,
+  },
 
-modalTitle: {
-  fontSize: 18,
-  fontWeight: "700",
-  marginBottom: 16,
-},
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
 
-input: {
-  borderWidth: 1,
-  borderColor: "#DDD",
-  borderRadius: 8,
-  padding: 12,
-  marginBottom: 10,
-},
+  input: {
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+  },
 
-modalButtonRow: {
-  flexDirection: "row",
-  justifyContent: "flex-end",
-  marginTop: 20,
-},
+  modalButtonRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 20,
+  },
 
-modalButton: {
-  paddingVertical: 10,
-  paddingHorizontal: 20,
-  borderRadius: 8,
-  marginLeft: 10,
-},
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
 
-cancelButton: {
-  borderWidth: 1,
-  borderColor: "#305685",
-  width: "48%",
-},
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: "#305685",
+    width: "48%",
+  },
 
-confirmButton: {
-  backgroundColor: "#305685",
-  width: "48%",
-},
+  confirmButton: {
+    backgroundColor: "#305685",
+    width: "48%",
+  },
 
-cancelText: {
-  color: "#305685",
-  fontWeight: "600",
-  textAlign: "center"
-},
+  cancelText: {
+    color: "#305685",
+    fontWeight: "600",
+    textAlign: "center",
+  },
 
-confirmText: {
-  color: "#FFF",
-  fontWeight: "600",
-  textAlign: "center"
-},
-
+  confirmText: {
+    color: "#FFF",
+    fontWeight: "600",
+    textAlign: "center",
+  },
 });

@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import { View, SafeAreaView, Platform, Dimensions } from "react-native";
+import {
+  View
+} from "react-native";
+import { SafeAreaProvider, SafeAreaView } 
+  from "react-native-safe-area-context";
 import { navigationRef } from "./src/navigation/RootNavigation";
 import Login from "./src/pages/Login";
 import Sidebar from "./src/components/Sidebar";
@@ -15,8 +19,8 @@ import Change from "./src/pages/Change";
 import Request from "./src/pages/Request/Request";
 import StatusContent from "./src/pages/Status/Content";
 import RequestContent from "./src/pages/Request/Content";
-import Setting from "./src/pages/Setting"
-import Application from "./src/pages/Application"
+import Setting from "./src/pages/Setting";
+import Application from "./src/pages/Application";
 
 const Stack = createStackNavigator();
 
@@ -88,17 +92,14 @@ function MainNavigator() {
 }
 
 export default function App() {
-  const { width } = Dimensions.get("window");
-
-  const isDesktop = Platform.OS === "web" && width >= 900;
-
   const [isSidebarDisabled, setIsSidebarDisabled] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = navigationRef.current?.addListener("state", () => {
-      const route = navigationRef.current.getCurrentRoute();
-      const options =
-        navigationRef.current.getCurrentOptions?.() || route?.params || {};
+    if (!navigationRef.isReady()) return;
+
+    const unsubscribe = navigationRef.addListener("state", () => {
+      const route = navigationRef.getCurrentRoute();
+      const options = route?.params ?? {};
 
       setIsSidebarDisabled(options.sidebarDisabled === true);
     });
@@ -107,12 +108,19 @@ export default function App() {
   }, []);
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <Header />
+    <SafeAreaProvider>
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={() => {
+          const route = navigationRef.getCurrentRoute();
+          const options = route?.params ?? {};
+          setIsSidebarDisabled(options.sidebarDisabled === true);
+        }}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+          <Header />
 
-        <View style={{ flex: 1, flexDirection: "row" }}>
-          {isDesktop && (
+          <View style={{ flex: 1, flexDirection: "row" }}>
             <View style={{ width: 350, position: "relative" }}>
               {isSidebarDisabled && (
                 <View
@@ -127,13 +135,13 @@ export default function App() {
               )}
               <Sidebar />
             </View>
-          )}
 
-          <View style={{ flex: 1 }}>
-            <MainNavigator />
+            <View style={{ flex: 1 }}>
+              <MainNavigator />
+            </View>
           </View>
-        </View>
-      </SafeAreaView>
-    </NavigationContainer>
+        </SafeAreaView>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }

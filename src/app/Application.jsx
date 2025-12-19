@@ -11,12 +11,12 @@ import {
 } from "react-native";
 
 const columns = [
-  { key: "name", title: "이름", width: 120, sortable: true },
-  { key: "department", title: "부서", width: 140, sortable: true },
-  { key: "type", title: "유형", width: 90, sortable: true },
-  { key: "date", title: "사용일자", width: 200, sortable: true },
-  { key: "reason", title: "사유", width: 200, sortable: true },
-  { key: "etc", title: "기타사항", width: 232, sortable: true },
+  { key: "name", title: "이름", width: 60, sortable: true },
+  { key: "department", title: "부서", width: 60, sortable: true },
+  { key: "type", title: "유형", width: 80, sortable: true },
+  { key: "date", title: "사용일자", width: 100, sortable: true },
+  { key: "reason", title: "사유", width: 80, sortable: true },
+  { key: "etc", title: "기타사항", width: 100, sortable: true }
 ];
 
 const initialData = [
@@ -33,7 +33,7 @@ const initialData = [
     id: 2,
     name: "이지우",
     department: "IT/ISO",
-    type: "연차",
+    type: "오전반차",
     date: "2025-01-12",
     reason: "가족 여행",
     etc: "싱가포르",
@@ -58,7 +58,7 @@ const initialData = [
   },
   {
     id: 5,
-    name: "이지우",
+    name: "김민지",
     department: "IT/ISO",
     type: "연차",
     date: "2025-02-12",
@@ -176,7 +176,7 @@ export default function Application() {
 
           <FlatList
             data={data}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.id.toString()}
             renderItem={renderRow}
             removeClippedSubviews
             initialNumToRender={10}
@@ -230,12 +230,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFF",
-    padding: 40,
+    padding: 20,
+    marginTop: 10
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
-    marginBottom: 12,
+    marginBottom: 30,
   },
 
   headerRow: {
@@ -259,26 +260,28 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontWeight: "600",
+    fontSize: 10
   },
   cellText: {
     color: "#333",
+    fontSize: 10
   },
 
   checkboxCell: {
-    width: 50,
+    width: 20,
     alignItems: "center",
     justifyContent: "center",
   },
   checkbox: {
-    width: 18,
-    height: 18,
+    width: 16,
+    height: 16,
     borderWidth: 1,
     borderColor: "#999",
     borderRadius: 4,
   },
   checkboxChecked: {
-    backgroundColor: "#4F46E5",
-    borderColor: "#4F46E5",
+    backgroundColor: "#121D6D",
+    borderColor: "#121D6D",
   },
 
   moreCell: {

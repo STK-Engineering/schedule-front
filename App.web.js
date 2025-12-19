@@ -7,20 +7,20 @@ import {
 import { SafeAreaProvider, SafeAreaView } 
   from "react-native-safe-area-context";
 import { navigationRef } from "./src/navigation/RootNavigation";
-import Login from "./src/pages/Login";
+import Login from "./src/web/Login";
 import Sidebar from "./src/components/Sidebar";
 import Header from "./src/components/Header";
-import Schedule from "./src/pages/Schedule";
-import Status from "./src/pages/Status/Status";
-import Form from "./src/pages/Form";
-import SignUp from "./src/pages/SignUp";
-import Find from "./src/pages/Find";
-import Change from "./src/pages/Change";
-import Request from "./src/pages/Request/Request";
-import StatusContent from "./src/pages/Status/Content";
-import RequestContent from "./src/pages/Request/Content";
-import Setting from "./src/pages/Setting";
-import Application from "./src/pages/Application";
+import Schedule from "./src/web/Schedule";
+import Status from "./src/web/Status/Status";
+import Form from "./src/web/Form";
+import SignUp from "./src/web/SignUp";
+import Find from "./src/web/Find";
+import Change from "./src/web/Change";
+import Request from "./src/web/Request/Request";
+import StatusContent from "./src/web/Status/Content";
+import RequestContent from "./src/web/Request/Content";
+import Setting from "./src/web/Setting";
+import Application from "./src/web/Application";
 
 const Stack = createStackNavigator();
 

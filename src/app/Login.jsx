@@ -24,16 +24,16 @@ export default function Login() {
     >
       <View
         style={{
-          width: "40%",
+          width: "80%",
           height: "50%",
           justifyContent: "center",
           alignItems: "center",
-          padding: 40,
+          padding: 30,
           borderRadius: 12,
           backgroundColor: "white",
         }}
       >
-        <Text style={{ fontSize: 19, fontWeight: 500, marginBottom: 30 }}>
+        <Text style={{ fontSize: 14, fontWeight: 500, marginBottom: 30 }}>
           로그인 후 이용 가능한 서비스입니다.
         </Text>
 
@@ -45,7 +45,7 @@ export default function Login() {
             alignItems: "flex-start",
           }}
         >
-          <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
+          <Text style={{ fontSize: 12, fontWeight: 400, marginBottom: 8 }}>
             이메일
           </Text>
           <TextInput
@@ -53,9 +53,10 @@ export default function Login() {
               width: "100%",
               borderWidth: 1,
               borderColor: "#121D6D",
-              padding: 14,
+              padding: 12,
               marginBottom: 10,
               borderRadius: 8,
+              fontSize: 12
             }}
             placeholder="이메일을 입력해주세요."
             onChangeText={(text) => setEmail(text)}
@@ -69,7 +70,7 @@ export default function Login() {
             alignItems: "flex-start",
           }}
         >
-          <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
+          <Text style={{ fontSize: 12, fontWeight: 400, marginBottom: 8 }}>
             비밀번호
           </Text>
           <TextInput
@@ -77,9 +78,10 @@ export default function Login() {
               width: "100%",
               borderWidth: 1,
               borderColor: "#121D6D",
-              padding: 14,
+              padding: 12,
               marginBottom: 14,
               borderRadius: 8,
+              fontSize: 12
             }}
             placeholder="비밀번호를 입력해주세요."
             secureTextEntry
@@ -93,19 +95,20 @@ export default function Login() {
             width: "100%",
             borderWidth: 1,
             borderColor: "#121D6D",
-            paddingVertical: 16,
+            paddingVertical: 12,
             borderRadius: 8,
           }}
+            onPress={() => navigation.replace("Main")}
         >
           <Text style={{ color: "white", textAlign: "center" }}>로그인</Text>
         </TouchableOpacity>
 
         <View
           style={{
-            marginTop: 35,
+            marginTop: 25,
             display: "flex",
             flexDirection: "row",
-            gap: 30,
+            gap: 20,
             alignItems: "center",
           }}
         >
@@ -117,7 +120,7 @@ export default function Login() {
             }}
             onPress={() => navigation.navigate("Find")}
           >
-            <Text style={{ color: "#121D6D", fontSize: 16 }}>
+            <Text style={{ color: "#121D6D", fontSize: 13 }}>
               비밀번호 찾기
             </Text>
           </TouchableOpacity>
@@ -132,7 +135,7 @@ export default function Login() {
             }}
             onPress={() => navigation.navigate("SignUp")}
           >
-            <Text style={{ color: "#121D6D", fontSize: 16 }}>회원가입</Text>
+            <Text style={{ color: "#121D6D", fontSize: 13 }}>회원가입</Text>
           </TouchableOpacity>
         </View>
       </View>

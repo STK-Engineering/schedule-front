@@ -178,11 +178,12 @@ export default function Sidebar() {
             flexDirection: "row",
             gap: 20
           }}
-          onPress={navigation.navigate("Setting")}
+          onPress={navigation.navigate("Application")}
         >
           <Image source={setting} style={{ width: 20, height: 20 }} />
-          <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>계정 관리</Text>
+          <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>신청서 / 계정 관리</Text>
         </TouchableOpacity>
+        
       </View>
     </View>
   );

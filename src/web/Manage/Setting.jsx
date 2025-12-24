@@ -9,7 +9,6 @@ import {
   Modal,
   TextInput,
 } from "react-native";
-import Checkbox from "expo-checkbox";
 
 const columns = [
   { key: "name", title: "이름", width: 120, sortable: true },
@@ -79,7 +78,7 @@ export default function Setting() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [sort, setSort] = useState({ key: null, direction: "asc" });
   const [modalVisible, setModalVisible] = useState(false);
-  const [checkedList, setCheckedList] = useState({});
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   const handleSort = (key) => {
     let direction = "asc";
@@ -121,35 +120,46 @@ export default function Setting() {
   );
 
   const renderRow = ({ item }) => {
-    const checked = selectedIds.includes(item.id);
-
+    const isOpen = openMenuId === item.id;
+    
     return (
       <View style={styles.row}>
-        <Checkbox
-                    value={!!checkedList[item.id]}
-                    onValueChange={(newValue) =>
-                      setCheckedList((prev) => ({
-                        ...prev,
-                        [item.id]: newValue,
-                      }))
-                    }
-                    color="#121D6D"
-                    style={{ margin: 15 }}
-                  />
         {columns.map((col) => (
           <View key={col.key} style={[styles.cell, { width: col.width }]}>
             <Text style={styles.cellText}>{item[col.key]}</Text>
           </View>
         ))}
 
-        <TouchableOpacity
-          style={styles.moreCell}
-          onPress={() => {
-            console.log("more", item);
-          }}
-        >
-          <Text style={styles.moreText}>⋮</Text>
-        </TouchableOpacity>
+        <View style={styles.moreWrapper}>
+          <TouchableOpacity
+            onPress={() => setOpenMenuId(isOpen ? null : item.id)}
+          >
+            <Text style={styles.moreText}>⋮</Text>
+          </TouchableOpacity>
+          {isOpen && (
+            <View style={styles.dropdown}>
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setOpenMenuId(null);
+                  console.log("계정 수정", item);
+                }}
+              >
+                <Text>계정 수정</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setOpenMenuId(null);
+                  console.log("계정 삭제", item);
+                }}
+              >
+                <Text style={{ color: "red" }}>계정 삭제</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -200,46 +210,44 @@ export default function Setting() {
         </View>
       </ScrollView>
       <Modal
-  visible={modalVisible}
-  transparent
-  animationType="fade"
-  onRequestClose={() => setModalVisible(false)}
->
-  <View style={styles.modalOverlay}>
-    <View style={styles.modalBox}>
-      <Text style={styles.modalTitle}>계정 추가</Text>
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>계정 추가</Text>
 
-      <TextInput style={styles.input} placeholder="이름" />
-      <TextInput style={styles.input} placeholder="부서" />
-      <TextInput style={styles.input} placeholder="직급" />
-      <TextInput style={styles.input} placeholder="입사일" />
-      <TextInput style={styles.input} placeholder="메일" />
-      <TextInput style={styles.input} placeholder="결재자" />
-      <TextInput style={styles.input} placeholder="권한" />
+            <TextInput style={styles.input} placeholder="이름" />
+            <TextInput style={styles.input} placeholder="부서" />
+            <TextInput style={styles.input} placeholder="직급" />
+            <TextInput style={styles.input} placeholder="입사일" />
+            <TextInput style={styles.input} placeholder="메일" />
+            <TextInput style={styles.input} placeholder="결재자" />
+            <TextInput style={styles.input} placeholder="권한" />
 
-      <View style={styles.modalButtonRow}>
-        <TouchableOpacity
-          style={[styles.modalButton, styles.confirmButton]}
-          onPress={() => setModalVisible(false)}
-        >
-          <Text style={styles.confirmText}>수정</Text>
-        </TouchableOpacity>
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.confirmText}>수정</Text>
+              </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.modalButton, styles.cancelButton]}
-          onPress={() => {
-            setModalVisible(false);
-          }}
-        >
-          <Text style={styles.cancelText}>취소</Text>
-        </TouchableOpacity>
-      </View>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setModalVisible(false);
+                }}
+              >
+                <Text style={styles.cancelText}>취소</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
-  </View>
-</Modal>
-
-    </View>
-    
   );
 }
 
@@ -314,67 +322,88 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   modalOverlay: {
-  flex: 1,
-  backgroundColor: "rgba(0,0,0,0.4)",
-  justifyContent: "center",
-  alignItems: "center",
-},
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
-modalBox: {
-  width: 340,
-  backgroundColor: "#FFF",
-  borderRadius: 16,
-  padding: 20,
-},
+  modalBox: {
+    width: 340,
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 20,
+  },
 
-modalTitle: {
-  fontSize: 18,
-  fontWeight: "700",
-  marginBottom: 16,
-},
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
 
-input: {
-  borderWidth: 1,
-  borderColor: "#DDD",
-  borderRadius: 8,
-  padding: 12,
-  marginBottom: 10,
-},
+  input: {
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+  },
 
-modalButtonRow: {
-  flexDirection: "row",
-  justifyContent: "flex-end",
-  marginTop: 20,
-},
+  modalButtonRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 20,
+  },
 
-modalButton: {
-  paddingVertical: 10,
-  paddingHorizontal: 20,
-  borderRadius: 8,
-  marginLeft: 10,
-},
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
 
-cancelButton: {
-  borderWidth: 1,
-  borderColor: "#305685",
-  width: "48%",
-},
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: "#305685",
+    width: "48%",
+  },
 
-confirmButton: {
-  backgroundColor: "#305685",
-  width: "48%",
-},
+  confirmButton: {
+    backgroundColor: "#305685",
+    width: "48%",
+  },
 
-cancelText: {
-  color: "#305685",
-  fontWeight: "600",
-  textAlign: "center"
-},
+  cancelText: {
+    color: "#305685",
+    fontWeight: "600",
+    textAlign: "center",
+  },
 
-confirmText: {
-  color: "#FFF",
-  fontWeight: "600",
-  textAlign: "center"
-},
+  confirmText: {
+    color: "#FFF",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  dropdown: {
+    position: "absolute",
+    top: 24,
+    right: 0,
+    width: 120,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    zIndex: 999,
 
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
 });

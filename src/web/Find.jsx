@@ -1,16 +1,47 @@
 import React, { useState } from "react";
+import axios from "axios";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
+  Alert
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
 export default function Find() {
   const navigation = useNavigation();
   const [email, setEmail] = useState("");
+
+  const api = axios.create({
+    baseURL: "https://schedule.stkkr.com",
+    timeout: 5000,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  const handleSendEmail = async () => {
+      if (!email) {
+        Alert.alert("알림", "이메일을 입력해주세요");
+        return;
+      }
+  
+      try {
+        const response = await api.post("/users/find/password", null, {
+          params: { email },
+        });
+  
+        navigation.navigate("Change");
+        console.log("재설정 인증코드 발송 성공:", response.data);
+      } catch (error) {
+        console.log(error);
+        Alert.alert(
+          "재설정 인증코드 발송 실패",
+          error.response?.data?.message || "서버 오류"
+        );
+      }
+    };
 
   return (
     <View
@@ -68,6 +99,7 @@ export default function Find() {
               borderRadius: 8,
             }}
             placeholder="이메일 주소를 입력해주세요."
+            value={email}
             onChangeText={(text) => setEmail(text)}
           />
           <TouchableOpacity
@@ -77,7 +109,7 @@ export default function Find() {
               paddingVertical: 14,
               borderRadius: 8,
             }}
-            onPress={() => navigation.navigate("Change")}
+            onPress={handleSendEmail}
           >
             <Text style={{ color: "white" }}>인증(필수)</Text>
           </TouchableOpacity>

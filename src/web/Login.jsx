@@ -1,17 +1,48 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import axios from "axios";
+import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
 export default function Login() {
   const navigation = useNavigation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const api = axios.create({
+    baseURL: "https://schedule.stkkr.com",
+    timeout: 5000,
+    withCredentials: true,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("알림", "이메일과 비밀번호를 입력해주세요");
+
+      navigation.navigate("Form");
+      return;
+    }
+
+    try {
+      const response = await api.post("/auth/login", {
+        email,
+        password
+      });
+
+      console.log("로그인 성공:", response.data);
+
+      navigation.navigate("Form");
+    } catch (error) {
+      console.log("error message:", error.message);
+      console.log("error request:", error.request);
+      Alert.alert(
+        "로그인 실패",
+        error.response?.data?.message || error.message
+      );
+    }
+  };
 
   return (
     <View
@@ -58,6 +89,8 @@ export default function Login() {
               borderRadius: 8,
             }}
             placeholder="이메일을 입력해주세요."
+            autoCapitalize="none"
+            value={email}
             onChangeText={(text) => setEmail(text)}
           />
         </View>
@@ -82,7 +115,8 @@ export default function Login() {
               borderRadius: 8,
             }}
             placeholder="비밀번호를 입력해주세요."
-            secureTextEntry
+            ssecureTextEntry
+            value={password}
             onChangeText={(text) => setPassword(text)}
           />
         </View>
@@ -96,7 +130,7 @@ export default function Login() {
             paddingVertical: 16,
             borderRadius: 8,
           }}
-            onPress={() => navigation.navigate("Form")}
+          onPress={handleLogin}
         >
           <Text style={{ color: "white", textAlign: "center" }}>로그인</Text>
         </TouchableOpacity>

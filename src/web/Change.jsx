@@ -1,17 +1,43 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import axios from "axios";
+import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 
 export default function Change() {
   const navigation = useNavigation();
   const [token, setToken] = useState("");
-  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
+  const api = axios.create({
+    baseURL: "https://schedule.stkkr.com",
+    timeout: 5000,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  const handleChange = async () => {
+    if (!token || !newPassword) {
+      Alert.alert("알림", "토큰과 기존비밀번호, 새비밀번호를 입력해주세요");
+      return;
+    }
+
+    try {
+      const response = await api.patch("/users/reset/password", {
+        token,
+        newPassword,
+      });
+
+      console.log("비밀번호 변경 성공:", response.data);
+      navigation.navigate("Login");
+    } catch (error) {
+      console.log(error);
+      Alert.alert(
+        "비밀번호 변경 실패",
+        error.response?.data?.message || "서버 오류"
+      );
+    }
+  };
 
   return (
     <View
@@ -65,6 +91,7 @@ export default function Change() {
                 borderRadius: 8,
               }}
               placeholder="메일로 받은 암호를 입력해주세요."
+              value={token}
               onChangeText={(text) => setToken(text)}
             />
           </View>
@@ -77,7 +104,7 @@ export default function Change() {
             }}
           >
             <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
-              비밀번호
+              새비밀번호
             </Text>
             <TextInput
               style={{
@@ -88,9 +115,10 @@ export default function Change() {
                 marginBottom: 14,
                 borderRadius: 8,
               }}
-              placeholder="비밀번호를 입력해주세요."
+              placeholder="새비밀번호를 입력해주세요."
               secureTextEntry
-              onChangeText={(text) => setPassword(text)}
+              value={newPassword}
+              onChangeText={(text) => setNewPassword(text)}
             />
           </View>
 
@@ -103,6 +131,7 @@ export default function Change() {
               paddingVertical: 16,
               borderRadius: 8,
             }}
+            onPress={handleChange}
           >
             <Text style={{ color: "white", textAlign: "center" }}>변경</Text>
           </TouchableOpacity>
@@ -122,9 +151,10 @@ export default function Change() {
               justifyContent: "center",
               alignItems: "center",
             }}
-            onPress={() => navigation.navigate("Find")}
           >
-            <Text style={{ color: "#121D6D", fontSize: 16 }}>비밀번호 찾기</Text>
+            <Text style={{ color: "#121D6D", fontSize: 16 }}>
+              비밀번호 찾기
+            </Text>
           </TouchableOpacity>
           <View
             style={{ height: "100%", width: 1, backgroundColor: "#A5A5A5" }}

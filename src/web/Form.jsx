@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api from "../api/api"
-
+import api from "../api/api";
 import {
   View,
   Text,
@@ -10,6 +9,7 @@ import {
   ScrollView,
   Image,
 } from "react-native";
+
 import Checkbox from "expo-checkbox";
 import category from "../../assets/icon/category.png";
 import cause from "../../assets/icon/reason.png";
@@ -24,6 +24,7 @@ export default function Form() {
   const [etc, setEtc] = useState("");
   const [isChecked, setChecked] = useState(false);
   const [diffDay, setDiffDay] = useState(null);
+  const [attemptedCheck, setAttemptedCheck] = useState(false);
 
   const sendDateForm = async () => {
     if (!isChecked) return;
@@ -46,29 +47,42 @@ export default function Form() {
   };
 
   useEffect(() => {
-  if (!startDate || !endDate) {
-    setDiffDay(0);
-    return;
-  }
+    if (!startDate || !endDate) {
+      setDiffDay(0);
+      return;
+    }
 
-  if (leaveType === "오전반차" || leaveType === "오후반차") {
-    setDiffDay(0.5);
-    return;
-  }
+    if (leaveType === "오전반차" || leaveType === "오후반차") {
+      setDiffDay(0.5);
+      return;
+    }
 
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
-  const diffTime = end - start;
-  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const diffTime = end - start;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-  if (diffDays < 0) {
-    setDiffDay(0);
-    return;
-  }
+    if (diffDays < 0) {
+      setDiffDay(0);
+      return;
+    }
 
-  setDiffDay(diffDays + 1);
-}, [startDate, endDate, leaveType]);
+    setDiffDay(diffDays + 1);
+  }, [startDate, endDate, leaveType]);
+
+  const isFormValid =
+    leaveType && startDate && endDate && reason.trim().length > 0 && etc.trim().length > 0;
+
+  useEffect(() => {
+    if (!isFormValid && isChecked) {
+      setChecked(false);
+    }
+
+    if (!isFormValid && attemptedCheck) {
+      setAttemptedCheck(false);
+    }
+  }, [isFormValid, isChecked, attemptedCheck]);
 
   return (
     <View style={styles.container}>
@@ -139,7 +153,9 @@ export default function Form() {
           />
         </View>
 
-        <View style={{ flexDirection: "row", gap: 20, alignItems: "startDate" }}>
+        <View
+          style={{ flexDirection: "row", gap: 20, alignItems: "startDate" }}
+        >
           <Image
             source={other}
             style={{ width: 30, height: 30, marginTop: 10 }}
@@ -156,8 +172,14 @@ export default function Form() {
           <Checkbox
             style={styles.checkbox}
             value={isChecked}
-            onValueChange={setChecked}
-            color="#121D6D"  
+            onValueChange={(val) => {
+              setAttemptedCheck(true);
+
+              if (isFormValid) {
+                setChecked(val);
+              }
+            }}
+            color={isFormValid ? "#121D6D" : "#b7b7b7"}
           />
           <View style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <Text style={{ fontSize: 12.5 }}>
@@ -170,10 +192,17 @@ export default function Form() {
             </Text>
           </View>
         </View>
+        <View style={styles.alert}>
+          {attemptedCheck && !isFormValid && (
+            <Text style={{ color: "red", fontSize: 12 }}>
+              필수 항목을 모두 입력해주세요.
+            </Text>
+          )}
+        </View>
         <View
           style={{
             flexDirection: "row",
-            justifyContent: "endDate",
+            justifyContent: "end",
             gap: 10,
             marginTop: 20,
           }}
@@ -181,22 +210,21 @@ export default function Form() {
           <TouchableOpacity
             style={{
               paddingVertical: 12,
-              backgroundColor: isChecked ? "#121D6D" : "#b7b7b7ff",
+              backgroundColor:
+                isChecked && isFormValid ? "#121D6D" : "#b7b7b7ff",
               width: "15%",
               borderWidth: 1,
-              borderColor: isChecked ? "#121D6D" : "#b7b7b7ff",
+              borderColor: isChecked && isFormValid ? "#121D6D" : "#b7b7b7ff",
               borderRadius: 10,
-              marginTop: 20,
               alignItems: "center",
             }}
             onPress={sendDateForm}
-            disabled={!isChecked}
+            disabled={!isChecked || !isFormValid}
           >
             <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
               확인
             </Text>
           </TouchableOpacity>
-     
         </View>
       </View>
 
@@ -431,7 +459,18 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     gap: 5,
     flexDirection: "row",
-    justifyContent: "startDate",
+    justifyContent: "start",
+  },
+  alert: {
+    marginTop: 8,
+    marginLeft: 60,
+    backgroundColor: "white",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    fontSize: 13,
+    flexDirection: "row",
+    justifyContent: "start",
   },
   textArea1: {
     height: 40,
@@ -465,6 +504,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   checkbox: {
-    margin: 8
+    margin: 8,
   },
 });

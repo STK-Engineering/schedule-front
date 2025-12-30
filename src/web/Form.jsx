@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import api from "../api/api"
+
 import {
   View,
   Text,
@@ -15,30 +17,58 @@ import time from "../../assets/icon/time.png";
 import other from "../../assets/icon/etc.png";
 
 export default function Form() {
-  const [type, setType] = useState("연차");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
+  const [leaveType, setLeaveType] = useState("연차");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [etc, setEtc] = useState("");
   const [isChecked, setChecked] = useState(false);
   const [diffDay, setDiffDay] = useState(null);
 
-  useEffect(() => {
-    if (start && end) {
-      const startDate = new Date(start);
-      const endDate = new Date(end);
+  const sendDateForm = async () => {
+    if (!isChecked) return;
 
-      const diffTime = endDate - startDate;
-      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const payload = {
+      usedDay: diffDay,
+      startDate: startDate,
+      endDate: endDate,
+      leaveType: leaveType,
+      reason,
+      etc,
+    };
 
-      if(diffDays < 0) {
-        setDiffDay(0);
-        return;
-      }
-
-      setDiffDay(diffDays);
+    try {
+      const response = await api.post("/leaves", payload);
+      console.log("신청 성공", response.data);
+    } catch (err) {
+      console.error("신청 실패", err);
     }
-  }, [start, end]);
+  };
+
+  useEffect(() => {
+  if (!startDate || !endDate) {
+    setDiffDay(0);
+    return;
+  }
+
+  if (leaveType === "오전반차" || leaveType === "오후반차") {
+    setDiffDay(0.5);
+    return;
+  }
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  const diffTime = end - start;
+  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+  if (diffDays < 0) {
+    setDiffDay(0);
+    return;
+  }
+
+  setDiffDay(diffDays + 1);
+}, [startDate, endDate, leaveType]);
 
   return (
     <View style={styles.container}>
@@ -46,21 +76,21 @@ export default function Form() {
         <View style={{ flexDirection: "row", gap: 20, alignItems: "center" }}>
           <Image source={category} style={{ width: 30, height: 30 }} />
 
-          <View style={styles.typeRow}>
-            {["연차", "반차(오전)", "반차(오후)", "경조사", "무급", "출산"].map(
+          <View style={styles.leaveTypeRow}>
+            {["연차", "오전반차", "오후반차", "경조사", "무급", "출산"].map(
               (item) => (
                 <TouchableOpacity
                   key={item}
                   style={[
-                    styles.typeButton,
-                    type === item && styles.typeButtonActive,
+                    styles.leaveTypeButton,
+                    leaveType === item && styles.leaveTypeButtonActive,
                   ]}
-                  onPress={() => setType(item)}
+                  onPress={() => setLeaveType(item)}
                 >
                   <Text
                     style={[
-                      styles.typeText,
-                      type === item && styles.typeTextActive,
+                      styles.leaveTypeText,
+                      leaveType === item && styles.leaveTypeTextActive,
                     ]}
                   >
                     {item}
@@ -73,17 +103,30 @@ export default function Form() {
 
         <View style={{ flexDirection: "row", gap: 20, alignItems: "center" }}>
           <Image source={time} style={{ width: 30, height: 30 }} />
-          <input
-            type="date"
-            style={styles.input}
-            onChange={(e) => setStart(e.target.value)}
-          ></input>
-          <Text>~</Text>
-          <input
-            type="date"
-            style={styles.input}
-            onChange={(e) => setEnd(e.target.value)}
-          ></input>
+          {leaveType === "오전반차" || leaveType === "오후반차" ? (
+            <input
+              type="date"
+              style={styles.input}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setEndDate(e.target.value);
+              }}
+            />
+          ) : (
+            <>
+              <input
+                type="date"
+                style={styles.input}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+              <Text>~</Text>
+              <input
+                type="date"
+                style={styles.input}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </>
+          )}
         </View>
         <View style={{ flexDirection: "row", gap: 20, alignItems: "center" }}>
           <Image source={cause} style={{ width: 30, height: 30 }} />
@@ -96,7 +139,7 @@ export default function Form() {
           />
         </View>
 
-        <View style={{ flexDirection: "row", gap: 20, alignItems: "start" }}>
+        <View style={{ flexDirection: "row", gap: 20, alignItems: "startDate" }}>
           <Image
             source={other}
             style={{ width: 30, height: 30, marginTop: 10 }}
@@ -114,6 +157,7 @@ export default function Form() {
             style={styles.checkbox}
             value={isChecked}
             onValueChange={setChecked}
+            color="#121D6D"  
           />
           <View style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <Text style={{ fontSize: 12.5 }}>
@@ -129,7 +173,7 @@ export default function Form() {
         <View
           style={{
             flexDirection: "row",
-            justifyContent: "end",
+            justifyContent: "endDate",
             gap: 10,
             marginTop: 20,
           }}
@@ -145,28 +189,14 @@ export default function Form() {
               marginTop: 20,
               alignItems: "center",
             }}
+            onPress={sendDateForm}
             disabled={!isChecked}
           >
             <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
               확인
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={{
-              paddingVertical: 12,
-              width: "17%",
-              borderWidth: 1,
-              borderColor: "#E2E8F0",
-              borderRadius: 10,
-              marginTop: 20,
-              alignItems: "center",
-            }}
-            disabled={!isChecked}
-          >
-            <Text style={{ color: "#000000", fontSize: 16, fontWeight: "400" }}>
-              임시 저장
-            </Text>
-          </TouchableOpacity>
+     
         </View>
       </View>
 
@@ -232,12 +262,15 @@ export default function Form() {
 
           <FormRow label="소속" value="IT/ISO" />
           <FormRow label="성명" value="" />
-          <FormRow label="휴가형태" value={type} />
+          <FormRow label="휴가형태" value={leaveType} />
           <FormRow
             label="기 간"
-            value={`${start || "미입력"}~${end || "미입력"}`}
+            value={`${startDate || "미입력"}~${endDate || "미입력"}`}
           />
-          <FormRow label="사용일" value={diffDay + "일" || "0일"} />
+          <FormRow
+            label="사용일"
+            value={diffDay !== null ? `${diffDay}일` : "0일"}
+          />
           <FormRow label="사유" value={reason || "기타"} />
           <FormRow label="기타 사항" value={etc} height={280} />
 
@@ -258,7 +291,7 @@ export default function Form() {
           </View>
 
           {/* 날짜 */}
-          <View style={{ marginTop: 10, alignItems: "flex-end" }}>
+          <View style={{ marginTop: 10, alignItems: "flex-endDate" }}>
             <Text style={{ fontSize: 11 }}>
               {new Date().toISOString().slice(0, 10)}
             </Text>
@@ -352,11 +385,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 15,
   },
-  typeRow: {
+  leaveTypeRow: {
     flexDirection: "row",
     marginTop: 10,
   },
-  typeButton: {
+  leaveTypeButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 10,
@@ -364,15 +397,15 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     marginRight: 10,
   },
-  typeButtonActive: {
+  leaveTypeButtonActive: {
     backgroundColor: "#121D6D",
     borderColor: "#121D6D",
   },
-  typeText: {
+  leaveTypeText: {
     fontSize: 14,
     color: "#475569",
   },
-  typeTextActive: {
+  leaveTypeTextActive: {
     color: "white",
   },
   input: {
@@ -398,7 +431,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     gap: 5,
     flexDirection: "row",
-    justifyContent: "start",
+    justifyContent: "startDate",
   },
   textArea1: {
     height: 40,
@@ -432,6 +465,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   checkbox: {
-    margin: 8,
+    margin: 8
   },
 });

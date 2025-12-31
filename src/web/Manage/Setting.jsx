@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,76 +9,69 @@ import {
   Modal,
   TextInput,
 } from "react-native";
+import api from "../../api/api";
 
 const columns = [
   { key: "name", title: "이름", width: 120, sortable: true },
-  { key: "department", title: "부서", width: 140, sortable: true },
+  { key: "department", title: "부서", width: 160, sortable: true },
   { key: "position", title: "직급", width: 100, sortable: true },
   { key: "date", title: "입사일", width: 160, sortable: true },
   { key: "mail", title: "메일", width: 182, sortable: true },
-  { key: "approver", title: "결재자", width: 120, sortable: true },
-  { key: "auth", title: "권한", width: 160, sortable: true },
-];
-
-const initialData = [
-  {
-    id: 1,
-    name: "이지우",
-    department: "IT/ISO",
-    position: "사원",
-    date: "2025-01-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
-  },
-  {
-    id: 2,
-    name: "이지우",
-    department: "IT/ISO",
-    position: "사원",
-    date: "2025-05-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
-  },
-  {
-    id: 3,
-    name: "김세진",
-    department: "IT/ISO",
-    position: "사원",
-    date: "2025-01-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
-  },
-  {
-    id: 4,
-    name: "이지우",
-    department: "IT/ISO",
-    position: "사원",
-    date: "2025-03-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
-  },
-  {
-    id: 5,
-    name: "이지우",
-    department: "IT/ISO",
-    position: "사원",
-    date: "2025-02-12",
-    mail: "jw.lee@stk-eng.com",
-    approver: "김미지",
-    auth: "결재자, 관리자",
-  },
+  { key: "approver", title: "결재자", width: 130, sortable: true },
+  { key: "auth", title: "권한", width: 130, sortable: true },
 ];
 
 export default function Setting() {
-  const [data, setData] = useState(initialData);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [sort, setSort] = useState({ key: null, direction: "asc" });
   const [modalVisible, setModalVisible] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchEmployeeList = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const res = await api.get("/employees");
+        const list = res.data;
+
+        if (!mounted) return;
+
+        setData(
+          list.map((e) => ({
+            name: e.name,
+            department: e.department,
+            position: e.level,
+            date: e.hireDate,
+            mail: e.email,
+            approver: e.approver?.name ?? "",
+            auth: e.role?.name ?? e.role ?? "",
+          }))
+        );
+      } catch (e) {
+        console.log(
+          "employee list error:",
+          e?.response?.status,
+          e?.response?.data
+        );
+        if (!mounted) return;
+        setError("직원 목록을 불러오지 못 했습니다.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchEmployeeList();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSort = (key) => {
     let direction = "asc";
@@ -119,23 +112,28 @@ export default function Setting() {
     </View>
   );
 
-  const renderRow = ({ item }) => {
-    const isOpen = openMenuId === item.id;
-    
+  const renderRow = ({ item, index }) => {
+    const isOpen = openMenuId === index;
+
     return (
       <View style={styles.row}>
         {columns.map((col) => (
           <View key={col.key} style={[styles.cell, { width: col.width }]}>
-            <Text style={styles.cellText}>{item[col.key]}</Text>
+            <Text style={styles.cellText}>
+              {typeof item[col.key] === "object"
+                ? item[col.key]?.name
+                : item[col.key]}
+            </Text>
           </View>
         ))}
 
         <View style={styles.moreWrapper}>
           <TouchableOpacity
-            onPress={() => setOpenMenuId(isOpen ? null : item.id)}
+            onPress={() => setOpenMenuId(isOpen ? null : index)}
           >
             <Text style={styles.moreText}>⋮</Text>
           </TouchableOpacity>
+
           {isOpen && (
             <View style={styles.dropdown}>
               <TouchableOpacity
@@ -195,20 +193,25 @@ export default function Setting() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView horizontal>
-        <View>
-          {renderHeader()}
-
-          <FlatList
-            data={data}
-            keyExtractor={(item) => item.id}
-            renderItem={renderRow}
-            removeClippedSubviews
-            initialNumToRender={10}
-            windowSize={7}
-          />
+      <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View style={{ height: 520 }}>
+          <View style={{ flex: 1 }}>
+            {renderHeader()}
+            <FlatList
+              data={data}
+              keyExtractor={(_, index) => String(index)}
+              renderItem={renderRow}
+              style={{ flex: 1 }}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+              removeClippedSubviews={false}
+              initialNumToRender={10}
+              windowSize={7}
+            />
+          </View>
         </View>
       </ScrollView>
+
       <Modal
         visible={modalVisible}
         transparent

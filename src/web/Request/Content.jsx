@@ -26,8 +26,6 @@ export default function RequestDetail({ route }) {
     rejectReason = "—",
   } = params;
 
-  const isPending = status === "대기";
-
   return (
     <ScrollView style={styles.container}>
       <Text style={{ fontSize: 20, padding: 5 }}>{status}</Text>

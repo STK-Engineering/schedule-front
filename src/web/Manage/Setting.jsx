@@ -12,13 +12,12 @@ import {
 import api from "../../api/api";
 
 const columns = [
-  { key: "name", title: "이름", width: 120, sortable: true },
-  { key: "department", title: "부서", width: 160, sortable: true },
-  { key: "position", title: "직급", width: 100, sortable: true },
-  { key: "date", title: "입사일", width: 160, sortable: true },
-  { key: "mail", title: "메일", width: 182, sortable: true },
-  { key: "approver", title: "결재자", width: 130, sortable: true },
-  { key: "auth", title: "권한", width: 130, sortable: true },
+  { key: "name", title: "이름", width: 130, sortable: true },
+  { key: "department", title: "부서", width: 180, sortable: true },
+  { key: "position", title: "직급", width: 110, sortable: true },
+  { key: "date", title: "입사일", width: 180, sortable: true },
+  { key: "mail", title: "메일", width: 220, sortable: true },
+  { key: "auth", title: "권한", width: 140, sortable: true },
 ];
 
 export default function Setting() {
@@ -49,7 +48,6 @@ export default function Setting() {
             position: e.level,
             date: e.hireDate,
             mail: e.email,
-            approver: e.approver?.name ?? "",
             auth: e.role?.name ?? e.role ?? "",
           }))
         );

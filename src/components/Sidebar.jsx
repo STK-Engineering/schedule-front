@@ -1,11 +1,55 @@
+import react, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
 import reqeust from "../../assets/icon/request.png";
 import setting from "../../assets/icon/setting.png";
+import api from "../api/api";
 
 export default function Sidebar() {
   const navigation = useNavigation();
+
+  const [leave, setLeave] = useState({
+    total: 0,
+    used: 0,
+    remaining: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchLeaveSummary = async () => {
+      try {
+        setLoading(true);
+
+        const res = await api.get("/balances");
+        const data = res.data;
+
+        if (!mounted) return;
+
+        setLeave({
+          total: Number(data.totalDays ?? 0),
+          used: Number(data.usedDays ?? 0),
+          remaining: Number(data.remainingDays ?? 0),
+        });
+      } catch (e) {
+        console.log(
+          "leave fetch error:",
+          e?.response?.status,
+          e?.response?.data
+        );
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchLeaveSummary();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <View
@@ -36,7 +80,7 @@ export default function Sidebar() {
             borderTopLeftRadius: 10,
             borderBottomLeftRadius: 10,
           }}
-          onPress={() => navigation.navigate("Form")}
+          onPress={() => navigation.navigate("Schedule")}
         >
           <Text style={{ color: "white", fontSize: 18, fontWeight: "bold" }}>
             연차 쓰기
@@ -113,12 +157,14 @@ export default function Sidebar() {
             justifyContent: "center",
             borderWidth: 1,
             borderColor: "#E2E8F0",
-            marginBottom: 60
+            marginBottom: 60,
           }}
         >
           <View style={{ alignItems: "center", gap: 5 }}>
             <Text>총 연차</Text>
-            <Text style={{ fontSize: 18 }}>15일</Text>
+            <Text style={{ fontSize: 18 }}>
+              {loading ? "-" : `${leave.total}일`}
+            </Text>
           </View>
 
           <View
@@ -131,7 +177,9 @@ export default function Sidebar() {
 
           <View style={{ alignItems: "center", gap: 5 }}>
             <Text>사용 일수</Text>
-            <Text style={{ fontSize: 18 }}>10일</Text>
+            <Text style={{ fontSize: 18 }}>
+              {loading ? "-" : `${leave.used}일`}
+            </Text>
           </View>
 
           <View
@@ -144,7 +192,9 @@ export default function Sidebar() {
 
           <View style={{ alignItems: "center", gap: 5 }}>
             <Text>잔여 일수</Text>
-            <Text style={{ fontSize: 18 }}>5일</Text>
+            <Text style={{ fontSize: 18 }}>
+              {loading ? "-" : `${leave.remaining}일`}
+            </Text>
           </View>
         </View>
 
@@ -159,13 +209,16 @@ export default function Sidebar() {
             paddingVertical: 13,
             flexDirection: "row",
             gap: 20,
-            marginBottom: 10
+            marginBottom: 10,
           }}
-          onPress={navigation.navigate("Request")}
+          onPress={() => navigation.navigate("Request")}
         >
           <Image source={reqeust} style={{ width: 20, height: 20 }} />
-          <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>요청 현황</Text>
+          <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>
+            요청 현황
+          </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
           style={{
             width: "100%",
@@ -176,14 +229,15 @@ export default function Sidebar() {
             alignItems: "center",
             paddingVertical: 13,
             flexDirection: "row",
-            gap: 20
+            gap: 20,
           }}
-          onPress={navigation.navigate("Application")}
+          onPress={() => navigation.navigate("Manage")}
         >
           <Image source={setting} style={{ width: 20, height: 20 }} />
-          <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>신청서 / 계정 관리</Text>
+          <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>
+            신청서 / 계정 관리
+          </Text>
         </TouchableOpacity>
-        
       </View>
     </View>
   );

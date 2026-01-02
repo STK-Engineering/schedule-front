@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  Alert,
 } from "react-native";
 import api from "../../api/api";
 
@@ -20,13 +21,152 @@ const columns = [
   { key: "auth", title: "권한", width: 140, sortable: true },
 ];
 
+const formatYYYYMMDD = (text) => {
+  const digits = String(text).replace(/\D/g, "").slice(0, 8);
+  const y = digits.slice(0, 4);
+  const m = digits.slice(4, 6);
+  const d = digits.slice(6, 8);
+
+  if (digits.length <= 4) return y;
+  if (digits.length <= 6) return `${y}-${m}`;
+  return `${y}-${m}-${d}`;
+};
+
+function SelectField({
+  label,
+  placeholder,
+  valueText,
+  open,
+  onToggle,
+  options,
+  onSelect,
+  zIndex,
+}) {
+  return (
+    <View style={[styles.selectWrap, { zIndex }]}>
+      <TouchableOpacity
+        style={styles.input}
+        onPress={onToggle}
+        activeOpacity={0.7}
+      >
+        <Text style={{ color: valueText ? "#000" : "#999" }}>
+          {valueText || placeholder}
+        </Text>
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.dropdownMenu}>
+          {options.map((opt) => (
+            <TouchableOpacity
+              key={String(opt.value)}
+              style={styles.dropdownItem2}
+              onPress={() => onSelect(opt.value)}
+            >
+              <Text>{opt.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function Setting() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sort, setSort] = useState({ key: null, direction: "asc" });
+
   const [modalVisible, setModalVisible] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [openDropdown, setOpenDropdown] = useState(null);
+
+  const [name, setName] = useState("");
+  const [department, setDepartment] = useState(null);
+  const [position, setPosition] = useState("");
+  const [hireDate, setHireDate] = useState("");
+  const [email, setEmail] = useState("");
+  const [location, setLocation] = useState("");
+  const [role, setRole] = useState("");
+
+  const DEPARTMENTS = useMemo(
+    () => [
+      { label: "MANAGEMENT", value: 1 },
+      { label: "Sales&Marketing", value: 2 },
+      { label: "ENGINEERING", value: 3 },
+      { label: "IT/ISO", value: 4 },
+    ],
+    []
+  );
+
+  const ROLES = useMemo(
+    () => [
+      { label: "ADMIN", value: "ADMIN" },
+      { label: "GENERAL", value: "GENERAL" },
+      { label: "MANAGER", value: "MANAGER" },
+    ],
+    []
+  );
+
+  const LOCATIONS = useMemo(
+    () => [
+      { label: "송정", value: "송정" },
+      { label: "반룡", value: "반룡" },
+    ],
+    []
+  );
+
+  const resetForm = () => {
+    setName("");
+    setDepartment(null);
+    setPosition("");
+    setHireDate("");
+    setEmail("");
+    setRole("");
+    setLocation("");
+    setOpenDropdown(null);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setOpenDropdown(null);
+  };
+
+  const sendData = async () => {
+    if (
+      !name ||
+      !email ||
+      !department ||
+      !position ||
+      !hireDate ||
+      !location ||
+      !role
+    ) {
+      alert("모든 항목을 다 채워주세요.");
+      return;
+    }
+
+    const payload = {
+      name,
+      email,
+      level: position,
+      role,
+      departmentId: department,
+      hireDate,
+      location,
+    };
+
+    try {
+      const response = await api.post("/employees", payload);
+      console.log("계정 추가 성공", response.data);
+
+      resetForm();
+      closeModal();
+    } catch (err) {
+      console.error("계정 추가 실패", err);
+      Alert.alert("실패", "계정 추가에 실패했습니다.");
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -65,7 +205,6 @@ export default function Setting() {
     };
 
     fetchEmployeeList();
-
     return () => {
       mounted = false;
     };
@@ -73,9 +212,7 @@ export default function Setting() {
 
   const handleSort = (key) => {
     let direction = "asc";
-    if (sort.key === key && sort.direction === "asc") {
-      direction = "desc";
-    }
+    if (sort.key === key && sort.direction === "asc") direction = "desc";
 
     const sorted = [...data].sort((a, b) => {
       if (a[key] > b[key]) return direction === "asc" ? 1 : -1;
@@ -160,34 +297,21 @@ export default function Setting() {
     );
   };
 
+  const departmentText = department
+    ? DEPARTMENTS.find((d) => d.value === department)?.label
+    : "";
+  const roleText = role || "";
+  const locationText = location || "";
+
   return (
     <View>
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 30,
-        }}
-      >
+      <View style={styles.topBar}>
         <Text style={styles.title}>직원 수({data.length})</Text>
         <TouchableOpacity
-          style={{
-            backgroundColor: "#305685",
-            borderWidth: 1,
-            borderColor: "#305685",
-            borderRadius: 12,
-            paddingVertical: 10,
-            paddingHorizontal: 45,
-          }}
+          style={styles.addBtn}
           onPress={() => setModalVisible(true)}
         >
-          <Text
-            style={{ color: "white", textAlign: "center", fontWeight: 500 }}
-          >
-            계정 추가
-          </Text>
+          <Text style={styles.addBtnText}>계정 추가</Text>
         </TouchableOpacity>
       </View>
 
@@ -214,54 +338,162 @@ export default function Setting() {
         visible={modalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={closeModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.modalOverlay}
+          onPress={() => {
+            setOpenDropdown(null);
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.modalBox}
+            onPress={() => {}}
+          >
             <Text style={styles.modalTitle}>계정 추가</Text>
 
-            <TextInput style={styles.input} placeholder="이름" />
-            <TextInput style={styles.input} placeholder="부서" />
-            <TextInput style={styles.input} placeholder="직급" />
-            <TextInput style={styles.input} placeholder="입사일" />
-            <TextInput style={styles.input} placeholder="메일" />
-            <TextInput style={styles.input} placeholder="결재자" />
-            <TextInput style={styles.input} placeholder="권한" />
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="이름"
+              onFocus={() => setOpenDropdown(null)}
+              placeholderTextColor="#999"
+            />
+
+            <SelectField
+              placeholder="부서 선택"
+              valueText={departmentText}
+              open={openDropdown === "department"}
+              onToggle={() =>
+                setOpenDropdown((prev) =>
+                  prev === "department" ? null : "department"
+                )
+              }
+              options={DEPARTMENTS}
+              onSelect={(v) => {
+                setDepartment(v);
+                setOpenDropdown(null);
+              }}
+              zIndex={30}
+            />
+
+            <TextInput
+              style={styles.input}
+              value={position}
+              onChangeText={setPosition}
+              placeholder="직급"
+              onFocus={() => setOpenDropdown(null)}
+              placeholderTextColor="#999"
+            />
+
+            <TextInput
+              style={styles.input}
+              value={hireDate}
+              onChangeText={(t) => setHireDate(formatYYYYMMDD(t))}
+              placeholder="입사일 (YYYY-MM-DD)"
+              keyboardType="number-pad"
+              onFocus={() => setOpenDropdown(null)}
+              maxLength={10}
+              placeholderTextColor="#999"
+            />
+
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="메일"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              onFocus={() => setOpenDropdown(null)}
+              placeholderTextColor="#999"
+            />
+
+            <SelectField
+              placeholder="권한 선택"
+              valueText={roleText}
+              open={openDropdown === "role"}
+              onToggle={() =>
+                setOpenDropdown((prev) => (prev === "role" ? null : "role"))
+              }
+              options={ROLES}
+              onSelect={(v) => {
+                setRole(v);
+                setOpenDropdown(null);
+              }}
+              zIndex={20}
+            />
+
+            <SelectField
+              placeholder="근무지 선택"
+              valueText={locationText}
+              open={openDropdown === "location"}
+              onToggle={() =>
+                setOpenDropdown((prev) =>
+                  prev === "location" ? null : "location"
+                )
+              }
+              options={LOCATIONS}
+              onSelect={(v) => {
+                setLocation(v);
+                setOpenDropdown(null);
+              }}
+              zIndex={10}
+            />
 
             <View style={styles.modalButtonRow}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton]}
-                onPress={() => setModalVisible(false)}
+                onPress={sendData}
               >
-                <Text style={styles.confirmText}>수정</Text>
+                <Text style={styles.confirmText}>추가</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
-                  setModalVisible(false);
+                  resetForm();
+                  closeModal();
                 }}
               >
                 <Text style={styles.cancelText}>취소</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFF",
-    padding: 40,
-  },
   title: {
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 12,
+  },
+
+  topBar: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  addBtn: {
+    backgroundColor: "#305685",
+    borderWidth: 1,
+    borderColor: "#305685",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 45,
+  },
+  addBtnText: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "500",
   },
 
   headerRow: {
@@ -295,23 +527,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderWidth: 1,
-    borderColor: "#999",
-    borderRadius: 4,
-  },
-  checkboxChecked: {
-    backgroundColor: "#4F46E5",
-    borderColor: "#4F46E5",
-  },
 
-  moreCell: {
-    width: 50,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   moreText: {
     fontSize: 18,
     color: "#555",
@@ -322,6 +538,7 @@ const styles = StyleSheet.create({
     color: "#666",
     fontWeight: "500",
   },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
@@ -348,6 +565,58 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
+    backgroundColor: "#fff",
+  },
+
+  selectWrap: {
+    position: "relative",
+    marginBottom: 10,
+  },
+
+  dropdownMenu: {
+    position: "absolute",
+    top: 52,
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    overflow: "hidden",
+  },
+
+  dropdown: {
+    position: "absolute",
+    top: 24,
+    right: 0,
+    width: 120,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    zIndex: 999,
+
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+
+  dropdownItem2: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
 
   modalButtonRow: {
@@ -384,27 +653,5 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "600",
     textAlign: "center",
-  },
-  dropdown: {
-    position: "absolute",
-    top: 24,
-    right: 0,
-    width: 120,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    zIndex: 999,
-
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-  },
-
-  dropdownItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
   },
 });

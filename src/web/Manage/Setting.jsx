@@ -16,9 +16,10 @@ const columns = [
   { key: "name", title: "이름", width: 130, sortable: true },
   { key: "department", title: "부서", width: 180, sortable: true },
   { key: "position", title: "직급", width: 110, sortable: true },
-  { key: "date", title: "입사일", width: 180, sortable: true },
+  { key: "date", title: "입사일", width: 130, sortable: true },
+  { key: "location", title: "근무지", width: 80, sortable: true },
   { key: "mail", title: "메일", width: 220, sortable: true },
-  { key: "auth", title: "권한", width: 140, sortable: true },
+  { key: "role", title: "권한", width: 140, sortable: true },
 ];
 
 const formatYYYYMMDD = (text) => {
@@ -33,7 +34,6 @@ const formatYYYYMMDD = (text) => {
 };
 
 function SelectField({
-  label,
   placeholder,
   valueText,
   open,
@@ -78,8 +78,13 @@ export default function Setting() {
   const [sort, setSort] = useState({ key: null, direction: "asc" });
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState(null);
   const [openDropdown, setOpenDropdown] = useState(null);
+
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuItem, setMenuItem] = useState(null);
+
+  const [mode, setMode] = useState("create");
+  const [editingId, setEditingId] = useState(null);
 
   const [name, setName] = useState("");
   const [department, setDepartment] = useState(null);
@@ -91,10 +96,12 @@ export default function Setting() {
 
   const DEPARTMENTS = useMemo(
     () => [
-      { label: "MANAGEMENT", value: 1 },
-      { label: "Sales&Marketing", value: 2 },
+      { label: "Sales&Marketing", value: 1 },
+      { label: "MANAGEMENT", value: 2 },
       { label: "ENGINEERING", value: 3 },
-      { label: "IT/ISO", value: 4 },
+      { label: "Logistic&warehouse", value: 4 },
+      { label: "IT/ISO", value: 5 },
+      { label: "Coordinator", value: 6 },
     ],
     []
   );
@@ -132,7 +139,16 @@ export default function Setting() {
     setOpenDropdown(null);
   };
 
-  const sendData = async () => {
+  const openCreateModal = () => {
+    setMode("create");
+    setEditingId(null);
+    resetForm();
+    setModalVisible(true);
+  };
+
+  const validateForm = () => {
+    const mustHaveRole = mode === "create";
+
     if (
       !name ||
       !email ||
@@ -140,26 +156,74 @@ export default function Setting() {
       !position ||
       !hireDate ||
       !location ||
-      !role
+      (mustHaveRole && !role)
     ) {
-      alert("모든 항목을 다 채워주세요.");
-      return;
+      Alert.alert("확인", "모든 항목을 다 채워주세요.");
+      return false;
     }
+    return true;
+  };
 
+  const buildPayload = () => {
     const payload = {
       name,
-      email,
       level: position,
-      role,
       departmentId: department,
       hireDate,
       location,
     };
 
-    try {
-      const response = await api.post("/employees", payload);
-      console.log("계정 추가 성공", response.data);
+    if (mode === "create") {
+      payload.email = email;
+      payload.role = role;
+    }
 
+    return payload;
+  };
+
+  const fetchEmployeeList = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const res = await api.get("/employees");
+      const list = res.data;
+
+      setData(
+        list.map((e) => ({
+          id: e.id,
+          name: e.name,
+          department: e.department,
+          departmentId: e.department?.id ?? null,
+          position: e.level ?? "",
+          date: e.hireDate ?? "",
+          location: e.location ?? "",
+          mail: e.email ?? "",
+          role: e.role?.name ?? e.role ?? "",
+        }))
+      );
+    } catch (e) {
+      console.log(
+        "employee list error:",
+        e?.response?.status,
+        e?.response?.data
+      );
+      setError("직원 목록을 불러오지 못 했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployeeList();
+  }, []);
+
+  const createEmployee = async () => {
+    if (!validateForm()) return;
+
+    try {
+      await api.post("/employees", buildPayload());
+      await fetchEmployeeList();
       resetForm();
       closeModal();
     } catch (err) {
@@ -168,47 +232,64 @@ export default function Setting() {
     }
   };
 
-  useEffect(() => {
-    let mounted = true;
+  const updateEmployee = async () => {
+    if (!editingId)
+      return Alert.alert("오류", "수정할 계정을 찾지 못했습니다.");
+    if (!validateForm()) return;
 
-    const fetchEmployeeList = async () => {
-      try {
-        setLoading(true);
-        setError("");
+    try {
+      await api.put(`/employees/${editingId}`, buildPayload());
+      await fetchEmployeeList();
 
-        const res = await api.get("/employees");
-        const list = res.data;
+      resetForm();
+      closeModal();
+      setMode("create");
+      setEditingId(null);
+    } catch (err) {
+      console.error("계정 수정 실패", err);
+      Alert.alert("실패", "계정 수정에 실패했습니다.");
+    }
+  };
 
-        if (!mounted) return;
+  const deleteEmployee = async (item) => {
+    const id = item?.id;
+    if (!id) {
+      Alert.alert("오류", "삭제할 계정을 찾지 못했습니다.");
+      return;
+    }
 
-        setData(
-          list.map((e) => ({
-            name: e.name,
-            department: e.department,
-            position: e.level,
-            date: e.hireDate,
-            mail: e.email,
-            auth: e.role?.name ?? e.role ?? "",
-          }))
-        );
-      } catch (e) {
-        console.log(
-          "employee list error:",
-          e?.response?.status,
-          e?.response?.data
-        );
-        if (!mounted) return;
-        setError("직원 목록을 불러오지 못 했습니다.");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
+    setMenuVisible(false);
+    setMenuItem(null);
 
-    fetchEmployeeList();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    try {
+      await api.delete(`/employees/${id}`);
+      await fetchEmployeeList();
+      console.log("완료", "계정이 삭제되었습니다.");
+    } catch (err) {
+      console.log("status error:", err?.response?.status, err?.response?.data);
+      Alert.alert("실패", "계정 삭제에 실패했습니다.");
+    }
+  };
+
+  const statusUser = async (item) => {
+    const id = item?.id;
+    if (!id) {
+      Alert.alert("오류", "비활성화할 계정을 찾지 못했습니다.");
+      return;
+    }
+
+    setMenuVisible(false);
+    setMenuItem(null);
+
+    try {
+      await api.put(`/users/${id}/status`);
+      await fetchEmployeeList();
+      console.log("완료", "계정이 비활성화되었습니다.");
+    } catch (err) {
+      console.log("status error:", err?.response?.status, err?.response?.data);
+      Alert.alert("실패", "계정 비활성화에 실패했습니다.");
+    }
+  };
 
   const handleSort = (key) => {
     let direction = "asc";
@@ -244,12 +325,31 @@ export default function Setting() {
           </Text>
         </TouchableOpacity>
       ))}
+      <View style={{ width: 40 }} />
     </View>
   );
 
-  const renderRow = ({ item, index }) => {
-    const isOpen = openMenuId === index;
+  const startEdit = (item) => {
+    setMode("edit");
+    setEditingId(item.id);
 
+    setName(item.name ?? "");
+    setPosition(item.position ?? "");
+    setHireDate(item.date ?? "");
+    setLocation(item.location ?? "");
+    setEmail(item.mail ?? "");
+    setDepartment(item.departmentId ?? item.department?.id ?? null);
+
+    setOpenDropdown(null);
+    setModalVisible(true);
+  };
+
+  const openRowMenu = (item) => {
+    setMenuItem(item);
+    setMenuVisible(true);
+  };
+
+  const renderRow = ({ item }) => {
     return (
       <View style={styles.row}>
         {columns.map((col) => (
@@ -262,36 +362,10 @@ export default function Setting() {
           </View>
         ))}
 
-        <View style={styles.moreWrapper}>
-          <TouchableOpacity
-            onPress={() => setOpenMenuId(isOpen ? null : index)}
-          >
+        <View style={styles.menuCell}>
+          <TouchableOpacity onPress={() => openRowMenu(item)}>
             <Text style={styles.moreText}>⋮</Text>
           </TouchableOpacity>
-
-          {isOpen && (
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setOpenMenuId(null);
-                  console.log("계정 수정", item);
-                }}
-              >
-                <Text>계정 수정</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setOpenMenuId(null);
-                  console.log("계정 삭제", item);
-                }}
-              >
-                <Text style={{ color: "red" }}>계정 삭제</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
       </View>
     );
@@ -306,14 +380,18 @@ export default function Setting() {
   return (
     <View>
       <View style={styles.topBar}>
-        <Text style={styles.title}>직원 수({data.length})</Text>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => setModalVisible(true)}
-        >
+        <Text style={styles.title}>
+          직원 수({data.length}){loading ? " (로딩중...)" : ""}
+        </Text>
+
+        <TouchableOpacity style={styles.addBtn} onPress={openCreateModal}>
           <Text style={styles.addBtnText}>계정 추가</Text>
         </TouchableOpacity>
       </View>
+
+      {!!error && (
+        <Text style={{ color: "red", marginBottom: 10 }}>{error}</Text>
+      )}
 
       <ScrollView horizontal showsHorizontalScrollIndicator>
         <View style={{ height: 520 }}>
@@ -321,7 +399,7 @@ export default function Setting() {
             {renderHeader()}
             <FlatList
               data={data}
-              keyExtractor={(_, index) => String(index)}
+              keyExtractor={(item, index) => String(item.id ?? index)}
               renderItem={renderRow}
               style={{ flex: 1 }}
               nestedScrollEnabled
@@ -335,6 +413,49 @@ export default function Setting() {
       </ScrollView>
 
       <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            setMenuVisible(false);
+            setMenuItem(null);
+          }}
+        >
+          <View style={styles.menuBox}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onStartShouldSetResponder={() => true}
+              onPress={() => {
+                if (!menuItem) return;
+                setMenuVisible(false);
+                startEdit(menuItem);
+              }}
+            >
+              <Text>계정 수정</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuItem, { borderBottomWidth: 0 }]}
+              onPress={() => statusUser(menuItem)}
+            >
+              <Text>계정 비활성화</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.menuItem, { borderBottomWidth: 0 }]}
+              onPress={() => deleteEmployee(menuItem)}
+            >
+              <Text style={{ color: "red" }}>계정 삭제</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
         visible={modalVisible}
         transparent
         animationType="fade"
@@ -343,16 +464,16 @@ export default function Setting() {
         <TouchableOpacity
           activeOpacity={1}
           style={styles.modalOverlay}
-          onPress={() => {
-            setOpenDropdown(null);
-          }}
+          onPress={() => setOpenDropdown(null)}
         >
           <TouchableOpacity
             activeOpacity={1}
             style={styles.modalBox}
             onPress={() => {}}
           >
-            <Text style={styles.modalTitle}>계정 추가</Text>
+            <Text style={styles.modalTitle}>
+              {mode === "edit" ? "계정 수정" : "계정 추가"}
+            </Text>
 
             <TextInput
               style={styles.input}
@@ -401,7 +522,7 @@ export default function Setting() {
             />
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, mode === "edit" && styles.disabledInput]}
               value={email}
               onChangeText={setEmail}
               placeholder="메일"
@@ -409,22 +530,25 @@ export default function Setting() {
               keyboardType="email-address"
               onFocus={() => setOpenDropdown(null)}
               placeholderTextColor="#999"
+              editable={mode !== "edit"}
             />
 
-            <SelectField
-              placeholder="권한 선택"
-              valueText={roleText}
-              open={openDropdown === "role"}
-              onToggle={() =>
-                setOpenDropdown((prev) => (prev === "role" ? null : "role"))
-              }
-              options={ROLES}
-              onSelect={(v) => {
-                setRole(v);
-                setOpenDropdown(null);
-              }}
-              zIndex={20}
-            />
+            {mode === "create" && (
+              <SelectField
+                placeholder="권한 선택"
+                valueText={roleText}
+                open={openDropdown === "role"}
+                onToggle={() =>
+                  setOpenDropdown((prev) => (prev === "role" ? null : "role"))
+                }
+                options={ROLES}
+                onSelect={(v) => {
+                  setRole(v);
+                  setOpenDropdown(null);
+                }}
+                zIndex={20}
+              />
+            )}
 
             <SelectField
               placeholder="근무지 선택"
@@ -446,9 +570,11 @@ export default function Setting() {
             <View style={styles.modalButtonRow}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton]}
-                onPress={sendData}
+                onPress={mode === "edit" ? updateEmployee : createEmployee}
               >
-                <Text style={styles.confirmText}>추가</Text>
+                <Text style={styles.confirmText}>
+                  {mode === "edit" ? "수정" : "추가"}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -456,6 +582,8 @@ export default function Setting() {
                 onPress={() => {
                   resetForm();
                   closeModal();
+                  setMode("create");
+                  setEditingId(null);
                 }}
               >
                 <Text style={styles.cancelText}>취소</Text>
@@ -469,12 +597,7 @@ export default function Setting() {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-
+  title: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
   topBar: {
     width: "100%",
     flexDirection: "row",
@@ -490,11 +613,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 45,
   },
-  addBtnText: {
-    color: "white",
-    textAlign: "center",
-    fontWeight: "500",
-  },
+  addBtnText: { color: "white", textAlign: "center", fontWeight: "500" },
 
   headerRow: {
     flexDirection: "row",
@@ -502,41 +621,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#DDD",
   },
-  row: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderColor: "#EEE",
-  },
+  row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#EEE" },
 
-  cell: {
-    padding: 12,
-    justifyContent: "center",
-  },
-  headerCell: {
-    backgroundColor: "#F4F6F8",
-  },
-  headerText: {
-    fontWeight: "600",
-  },
-  cellText: {
-    color: "#333",
-  },
+  cell: { padding: 12, justifyContent: "center" },
+  headerCell: { backgroundColor: "#F4F6F8" },
+  headerText: { fontWeight: "600" },
+  cellText: { color: "#333" },
 
-  checkboxCell: {
-    width: 50,
+  checkboxCell: { width: 50, alignItems: "center", justifyContent: "center" },
+
+  menuCell: {
+    width: 40,
     alignItems: "center",
     justifyContent: "center",
   },
+  moreText: { fontSize: 18, color: "#555" },
+  sortIcon: { fontSize: 12, marginLeft: 4, color: "#666", fontWeight: "500" },
 
-  moreText: {
-    fontSize: 18,
-    color: "#555",
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  sortIcon: {
-    fontSize: 12,
-    marginLeft: 4,
-    color: "#666",
-    fontWeight: "500",
+  menuBox: {
+    width: 220,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+  },
+  menuItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
 
   modalOverlay: {
@@ -545,19 +668,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   modalBox: {
     width: 340,
     backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 20,
   },
-
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
-  },
+  modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 16 },
 
   input: {
     borderWidth: 1,
@@ -567,11 +684,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: "#fff",
   },
-
-  selectWrap: {
-    position: "relative",
-    marginBottom: 10,
+  disabledInput: {
+    backgroundColor: "#F2F2F2",
+    color: "#666",
   },
+
+  selectWrap: { position: "relative", marginBottom: 10 },
 
   dropdownMenu: {
     position: "absolute",
@@ -589,29 +707,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  dropdown: {
-    position: "absolute",
-    top: 24,
-    right: 0,
-    width: 120,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    zIndex: 999,
-
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-  },
-
-  dropdownItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-
   dropdownItem2: {
     paddingVertical: 12,
     paddingHorizontal: 12,
@@ -624,7 +719,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     marginTop: 20,
   },
-
   modalButton: {
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -632,26 +726,9 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 
-  cancelButton: {
-    borderWidth: 1,
-    borderColor: "#305685",
-    width: "48%",
-  },
+  cancelButton: { borderWidth: 1, borderColor: "#305685", width: "48%" },
+  confirmButton: { backgroundColor: "#305685", width: "48%" },
 
-  confirmButton: {
-    backgroundColor: "#305685",
-    width: "48%",
-  },
-
-  cancelText: {
-    color: "#305685",
-    fontWeight: "600",
-    textAlign: "center",
-  },
-
-  confirmText: {
-    color: "#FFF",
-    fontWeight: "600",
-    textAlign: "center",
-  },
+  cancelText: { color: "#305685", fontWeight: "600", textAlign: "center" },
+  confirmText: { color: "#FFF", fontWeight: "600", textAlign: "center" },
 });

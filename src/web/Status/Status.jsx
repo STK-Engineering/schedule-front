@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
   ScrollView,
-  Linking,
   Pressable,
   Alert,
   ActivityIndicator,
@@ -14,12 +13,11 @@ import { useNavigation } from "@react-navigation/native";
 import pdf from "../../../assets/img/pdf.png";
 import api from "../../api/api";
 
-const BASE_URL = api?.defaults?.baseURL || "";
-
 const STATUS_STYLE = {
   승인: { bg: "#E8EDFF", text: "#121D6D", dot: "#121D6D" },
   거절: { bg: "#FFE9E7", text: "#FF2116", dot: "#FF2116" },
   대기: { bg: "#EEF2F7", text: "#475569", dot: "#64748B" },
+  반려: { bg: "#FFE9E7", text: "#FF2116", dot: "#FF2116" }, // 혹시 반려도 쓰면
 };
 
 function formatPeriod(startDate, endDate) {
@@ -33,64 +31,62 @@ export default function Status() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // ✅ AbortController로 안전하게 취소 처리 (mounted 필요 없음)
+  const fetchLeaves = async (signal, { silent = false } = {}) => {
+    try {
+      if (!silent) setLoading(true);
+      setError("");
+
+      const res = await api.get("/leaves/me", { signal });
+
+      const waiting = res.data?.["요청 대기 건"] ?? [];
+      const done = res.data?.["요청 처리 건"] ?? [];
+
+      const mapItem = (e) => ({
+        id: e.id,
+        department: e.employee?.department?.name ?? "",
+        name: e.employee?.name ?? "",
+        position: e.employee?.level ?? "사원",
+
+        type: e.leaveType,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        usedDay: e.usedDay,
+
+        reason: e.reason ?? "",
+        etc: e.etc ?? "",
+        status: e.approvalStatus ?? "대기",
+
+        rejectionReason: e.rejectionReason ?? "—",
+        file: pdf,
+      });
+
+      setData({
+        waiting: waiting.map(mapItem),
+        done: done.map(mapItem),
+      });
+    } catch (e) {
+      // ✅ 요청 취소면 무시
+      if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
+
+      console.log("leaves error message:", e?.message);
+      console.log("leaves error url:", e?.config?.baseURL, e?.config?.url);
+      console.log(
+        "leaves error status/data:",
+        e?.response?.status,
+        e?.response?.data
+      );
+
+      setError("요청 목록을 불러오지 못 했습니다.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let mounted = true;
-
-    const fetchLeaves = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const res = await api.get("/leaves/me");
-        const waiting = res.data?.["요청 대기 건"] ?? [];
-        const done = res.data?.["요청 처리 건"] ?? [];
-
-        if (!mounted) return;
-
-        const mapItem = (e) => ({
-          id: e.id,
-          department: e.employee?.department?.name ?? "",
-          name: e.employee?.name ?? "",
-          position: e.employee?.level ?? "사원",
-
-          type: e.leaveType,
-          startDate: e.startDate,
-          endDate: e.endDate,
-          usedDay: e.usedDay,
-
-          reason: e.reason ?? "",
-          extra: e.etc ?? "",
-          status: e.approvalStatus ?? "대기",
-
-          rejectReason: e.rejectReason ?? "—",
-
-          file: pdf,
-        });
-
-        setData({
-          waiting: waiting.map(mapItem),
-          done: done.map(mapItem),
-        });
-      } catch (e) {
-        console.log("leaves error message:", e?.message);
-        console.log("leaves error url:", e?.config?.baseURL, e?.config?.url);
-        console.log(
-          "leaves error status/data:",
-          e?.response?.status,
-          e?.response?.data
-        );
-
-        if (!mounted) return;
-        setError("요청 목록을 불러오지 못 했습니다.");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    fetchLeaves();
-    return () => {
-      mounted = false;
-    };
+    const controller = new AbortController();
+    fetchLeaves(controller.signal);
+    return () => controller.abort();
   }, []);
 
   const waitingCount = data.waiting.length;
@@ -117,7 +113,11 @@ export default function Status() {
         emptyText="승인 대기 요청이 없습니다."
       >
         {data.waiting.map((item) => (
-          <Item key={item.id} item={item} />
+          <Item
+            key={item.id}
+            item={item}
+            onDeleted={() => fetchLeaves(undefined, { silent: true })}
+          />
         ))}
       </Section>
 
@@ -127,7 +127,11 @@ export default function Status() {
         emptyText="처리된 요청이 없습니다."
       >
         {data.done.map((item) => (
-          <Item key={item.id} item={item} />
+          <Item
+            key={item.id}
+            item={item}
+            onDeleted={() => fetchLeaves(undefined, { silent: true })}
+          />
         ))}
       </Section>
     </ScrollView>
@@ -153,42 +157,73 @@ function Section({ title, count, emptyText, children }) {
   );
 }
 
-function Item({ item }) {
+function Item({ item, onDeleted }) {
   const navigation = useNavigation();
 
-  const fileUrl = `${BASE_URL}/leaves/${item.id}/download`;
-  const statusTheme = STATUS_STYLE[item.state] || STATUS_STYLE["대기"];
+  const statusTheme = STATUS_STYLE[item.status] || STATUS_STYLE["대기"];
 
-  const openPdf = async () => {
+  const hidePdf = item.status === "반려" || item.status === "거절";
+
+  const downloadPdf = async () => {
     try {
-      if (!fileUrl) {
-        Alert.alert("오류", "파일 URL이 없습니다.");
-        return;
-      }
-      const supported = await Linking.canOpenURL(fileUrl);
-      if (!supported) {
-        Alert.alert("오류", "PDF를 열 수 없습니다.");
-        return;
-      }
-      await Linking.openURL(fileUrl);
-    } catch {
-      Alert.alert("오류", "파일을 여는 중 문제가 발생했습니다.");
+      const res = await api.get(`/leaves/${item.id}/download`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `휴가신청_${item.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.log(
+        "pdf download error:",
+        e?.response?.status,
+        e?.response?.data
+      );
+      Alert.alert("오류", "PDF 다운로드에 실패했습니다.");
     }
+  };
+
+  const cancelLeave = async () => {
+    try {
+      await api.delete(`/leaves/${item.id}`);
+      Alert.alert("완료", "휴가 신청이 취소되었습니다.");
+      onDeleted?.();
+    } catch (e) {
+      console.log("delete error:", e?.response?.status, e?.response?.data);
+      Alert.alert("실패", "휴가 신청 취소에 실패했습니다.");
+    }
+  };
+
+  const goEdit = () => {
+    navigation.navigate("Edit", {
+      id: item.id,
+      leaveType: item.type,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      reason: item.reason,
+      etc: item.etc,
+      status: item.status,
+    });
   };
 
   return (
     <Pressable
       style={styles.itemCard}
       onPress={() => navigation.navigate("StatusContent", { ...item })}
-
     >
       <View style={styles.itemLeft}>
         <Text style={styles.itemType}>{item.type}</Text>
-
         <Text style={styles.itemSub}>
           {formatPeriod(item.startDate, item.endDate)}
         </Text>
-
         <Text style={styles.itemMeta}>
           사용일수 <Text style={styles.itemMetaStrong}>{item.usedDay}</Text>
         </Text>
@@ -204,14 +239,40 @@ function Item({ item }) {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.pdfBtn}
-          onPress={openPdf}
-          activeOpacity={0.7}
-        >
-          <Image source={item.file} style={styles.pdfIcon} />
-          <Text style={styles.pdfText}>PDF</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {/* 수정 */}
+          <TouchableOpacity
+            style={[styles.pdfBtn, { paddingHorizontal: 12 }]}
+            onPress={goEdit}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.pdfText}>수정</Text>
+          </TouchableOpacity>
+
+          {/* 취소 */}
+          <TouchableOpacity
+            style={[
+              styles.pdfBtn,
+              { paddingHorizontal: 12, backgroundColor: "#FEE2E2" },
+            ]}
+            onPress={cancelLeave}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.pdfText, { color: "#DC2626" }]}>취소</Text>
+          </TouchableOpacity>
+
+          {/* PDF */}
+          {!hidePdf && (
+            <TouchableOpacity
+              style={styles.pdfBtn}
+              onPress={downloadPdf}
+              activeOpacity={0.7}
+            >
+              <Image source={item.file} style={styles.pdfIcon} />
+              <Text style={styles.pdfText}>PDF</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </Pressable>
   );

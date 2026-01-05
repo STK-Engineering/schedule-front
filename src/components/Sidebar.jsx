@@ -1,4 +1,4 @@
-import react, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, Image } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
@@ -15,6 +15,8 @@ export default function Sidebar() {
     remaining: 0,
   });
   const [loading, setLoading] = useState(true);
+
+  const [role, setRole] = useState(null); 
 
   useEffect(() => {
     let mounted = true;
@@ -34,22 +36,36 @@ export default function Sidebar() {
           remaining: Number(data.remainingDays ?? 0),
         });
       } catch (e) {
-        console.log(
-          "leave fetch error:",
-          e?.response?.status,
-          e?.response?.data
-        );
+        console.log("leave fetch error:", e?.response?.status, e?.response?.data);
       } finally {
         if (mounted) setLoading(false);
       }
     };
 
+    const fetchMe = async () => {
+      try {
+        const res = await api.get("/employees/me");
+        const data = res.data;
+
+        if (!mounted) return;
+
+        setRole(String(data?.role ?? "").toLowerCase());
+      } catch (e) {
+        console.log("me fetch error:", e?.response?.status, e?.response?.data);
+        if (mounted) setRole(null);
+      }
+    };
+
     fetchLeaveSummary();
+    fetchMe();
 
     return () => {
       mounted = false;
     };
   }, []);
+
+  const canSeeRequest = role === "admin" || role === "manager";
+  const canSeeManage = role === "admin";
 
   return (
     <View
@@ -198,46 +214,50 @@ export default function Sidebar() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={{
-            width: "100%",
-            borderWidth: 2,
-            borderColor: "#305685",
-            borderRadius: 10,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingVertical: 13,
-            flexDirection: "row",
-            gap: 20,
-            marginBottom: 10,
-          }}
-          onPress={() => navigation.navigate("Request")}
-        >
-          <Image source={reqeust} style={{ width: 20, height: 20 }} />
-          <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>
-            요청 현황
-          </Text>
-        </TouchableOpacity>
+        {canSeeRequest && (
+          <TouchableOpacity
+            style={{
+              width: "100%",
+              borderWidth: 2,
+              borderColor: "#305685",
+              borderRadius: 10,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingVertical: 13,
+              flexDirection: "row",
+              gap: 20,
+              marginBottom: 10,
+            }}
+            onPress={() => navigation.navigate("Request")}
+          >
+            <Image source={reqeust} style={{ width: 20, height: 20 }} />
+            <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>
+              요청 현황
+            </Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={{
-            width: "100%",
-            borderWidth: 2,
-            borderColor: "#305685",
-            borderRadius: 10,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingVertical: 13,
-            flexDirection: "row",
-            gap: 20,
-          }}
-          onPress={() => navigation.navigate("Manage")}
-        >
-          <Image source={setting} style={{ width: 20, height: 20 }} />
-          <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>
-            신청서 / 계정 관리
-          </Text>
-        </TouchableOpacity>
+        {canSeeManage && (
+          <TouchableOpacity
+            style={{
+              width: "100%",
+              borderWidth: 2,
+              borderColor: "#305685",
+              borderRadius: 10,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingVertical: 13,
+              flexDirection: "row",
+              gap: 20,
+            }}
+            onPress={() => navigation.navigate("Manage")}
+          >
+            <Image source={setting} style={{ width: 20, height: 20 }} />
+            <Text style={{ color: "#305685", fontSize: 16, fontWeight: 600 }}>
+              신청서 / 계정 관리
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

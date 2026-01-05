@@ -1,17 +1,16 @@
-import React, { useEffect, useState, useMemo } from "react";
-import { View, Text, TouchableOpacity, Image } from "react-native";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { View, Text, TouchableOpacity, Image, Platform } from "react-native";
 import { Calendar } from "react-native-big-calendar";
-import api from "../api/api"
+import api from "../api/api";
 import department from "../../assets/icon/department.png";
 
 function leaveTypeToTimeRange(leaveType) {
   switch (leaveType) {
-    case "AM_HALF":
+    case "오전반차":
       return { startH: 9, startM: 0, endH: 14, endM: 0 };
-    case "PM_HALF":
+    case "오후반차":
       return { startH: 14, startM: 0, endH: 18, endM: 0 };
-    case "FULL": 
-    case "ANNUAL":
+    case "연차":
     default:
       return { startH: 9, startM: 0, endH: 18, endM: 0 };
   }
@@ -26,7 +25,6 @@ function leaveToEvent(item) {
   const empName = item?.employee?.name ?? "이름없음";
   const deptName = item?.employee?.department?.name ?? "";
   const leaveType = item?.leaveType ?? "";
-  const status = item?.leaveStatus ?? "";
   const reason = item?.reason ?? "";
 
   const { startH, startM, endH, endM } = leaveTypeToTimeRange(leaveType);
@@ -34,33 +32,51 @@ function leaveToEvent(item) {
   const start = toDate(item.startDate, startH, startM);
   const end = toDate(item.endDate, endH, endM);
 
-  const typeLabel =
-    leaveType === "PM_HALF"
-      ? "반차(오후)"
-      : leaveType === "AM_HALF"
-      ? "반차(오전)"
-      : "연차";
-
-  const title = `${empName}${deptName ? ` (${deptName})` : ""} - ${typeLabel}${
+  const title = `${empName}${deptName ? ` (${deptName})` : ""} - ${leaveType}${
     reason ? ` / ${reason}` : ""
   }`;
 
-  return {
-    title,
-    start,
-    end,
-    isMine: item?.isMine ?? false,
-    raw: item, 
-  };
+  return { title, start, end, isMine: item?.isMine ?? false, raw: item };
 }
+
+const addDays = (date, days) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+};
+
+const addMonths = (date, months) => {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+};
+
+const normalizeForMode = (date, mode) => {
+  const d = new Date(date);
+  if (mode === "month") {
+    d.setDate(1);
+    d.setHours(0, 0, 0, 0);
+  }
+  return d;
+};
+
+const moveByMode = (date, mode, step) => {
+  if (mode === "day") return addDays(date, step);
+  if (mode === "week") return addDays(date, 7 * step);
+  return addMonths(date, step);
+};
 
 export default function Schedule() {
   const [mode, setMode] = useState("month");
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() =>
+    normalizeForMode(new Date(), "month")
+  );
   const [events, setEvents] = useState([]);
   const [selectedDept, setSelectedDept] = useState([]);
   const [onlyMine, setOnlyMine] = useState(false);
   const [deptOpen, setDeptOpen] = useState(false);
+
+  const [dragStartX, setDragStartX] = useState(null);
 
   const departments = useMemo(
     () => [
@@ -74,9 +90,49 @@ export default function Schedule() {
     []
   );
 
+  const fetchLeaves = useCallback(async () => {
+    try {
+      let res;
+      let list = [];
+
+      if (onlyMine) {
+        res = await api.get("/leaves/me");
+
+        if (Array.isArray(res.data)) {
+          list = res.data;
+        } else {
+          list = [
+            ...(res.data?.["요청 대기 건"] ?? []),
+            ...(res.data?.["요청 처리 건"] ?? []),
+          ];
+        }
+
+        list = list.map((x) => ({ ...x, isMine: true }));
+      } else {
+        res = await api.get("/leaves", {
+          params: { departments: selectedDept },
+        });
+
+        list = res.data ?? [];
+      }
+
+      const approvedOnly = list.filter(
+        (item) => item.approvalStatus === "승인"
+      );
+
+      setEvents(approvedOnly.map(leaveToEvent));
+    } catch (e) {
+      console.error("스케줄 불러오기 실패", e);
+    }
+  }, [onlyMine, selectedDept]);
+
   useEffect(() => {
     fetchLeaves();
-  }, [selectedDept, onlyMine]);
+  }, [fetchLeaves]);
+
+  useEffect(() => {
+    setCurrentDate((prev) => normalizeForMode(prev, mode));
+  }, [mode]);
 
   const toggleDept = (dept) => {
     setSelectedDept((prev) =>
@@ -91,20 +147,55 @@ export default function Schedule() {
     return `${first} 외 ${rest.length}`;
   };
 
-  const fetchLeaves = async () => {
-    try {
-      const res = await api.get("/leaves", {
-        params: {
-          departments: selectedDept,
-          onlyMine,
-        },
-      });
+  const onMouseDown = (e) => {
+    if (Platform.OS !== "web") return;
+    const x = e?.nativeEvent?.pageX;
+    if (typeof x === "number") setDragStartX(x);
+  };
 
-      const formatted = (res.data ?? []).map(leaveToEvent);
-      setEvents(formatted);
-    } catch (e) {
-      console.error("스케줄 불러오기 실패", e);
+  const onMouseUp = (e) => {
+    if (Platform.OS !== "web") return;
+    const endX = e?.nativeEvent?.pageX;
+    if (dragStartX == null || typeof endX !== "number") return;
+
+    const dx = endX - dragStartX;
+    const threshold = 60;
+
+    if (dx > threshold) {
+      setCurrentDate((prev) =>
+        normalizeForMode(moveByMode(prev, mode, -1), mode)
+      );
+    } else if (dx < -threshold) {
+      setCurrentDate((prev) =>
+        normalizeForMode(moveByMode(prev, mode, +1), mode)
+      );
     }
+
+    setDragStartX(null);
+  };
+  const onTouchStart = (e) => {
+    const x = e?.nativeEvent?.pageX;
+    if (typeof x === "number") setDragStartX(x);
+  };
+
+  const onTouchEnd = (e) => {
+    const endX = e?.nativeEvent?.pageX;
+    if (dragStartX == null || typeof endX !== "number") return;
+
+    const dx = endX - dragStartX;
+    const threshold = 60;
+
+    if (dx > threshold) {
+      setCurrentDate((prev) =>
+        normalizeForMode(moveByMode(prev, mode, -1), mode)
+      );
+    } else if (dx < -threshold) {
+      setCurrentDate((prev) =>
+        normalizeForMode(moveByMode(prev, mode, +1), mode)
+      );
+    }
+
+    setDragStartX(null);
   };
 
   return (
@@ -207,21 +298,30 @@ export default function Schedule() {
                 borderRadius: 10,
               }}
             >
-              <Text>{m === "day" ? "일간" : m === "week" ? "주간" : "월간"}</Text>
+              <Text>
+                {m === "day" ? "일간" : m === "week" ? "주간" : "월간"}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View
+        style={{ flex: 1 }}
+        onMouseDown={onMouseDown}
+        onMouseUp={onMouseUp}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         <Calendar
           events={events}
           height={600}
           mode={mode}
+          date={currentDate}
+          swipeEnabled={false}
           eventCellStyle={(e) => ({
             backgroundColor: e.isMine ? "#2563EB" : "#9CA3AF",
           })}
-          onChangeDate={(range) => range?.date && setCurrentDate(range.date)}
         />
       </View>
     </View>

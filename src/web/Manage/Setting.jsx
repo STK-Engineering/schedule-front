@@ -13,13 +13,14 @@ import {
 import api from "../../api/api";
 
 const columns = [
-  { key: "name", title: "이름", width: 130, sortable: true },
-  { key: "department", title: "부서", width: 180, sortable: true },
-  { key: "position", title: "직급", width: 110, sortable: true },
+  { key: "name", title: "이름", width: 90, sortable: true },
+  { key: "department", title: "부서", width: 150, sortable: true },
+  { key: "position", title: "직급", width: 80, sortable: true },
   { key: "date", title: "입사일", width: 130, sortable: true },
   { key: "location", title: "근무지", width: 80, sortable: true },
-  { key: "mail", title: "메일", width: 220, sortable: true },
-  { key: "role", title: "권한", width: 140, sortable: true },
+  { key: "mail", title: "메일", width: 200, sortable: true },
+  { key: "role", title: "권한", width: 120, sortable: true },
+  { key: "status", title: "상태", width: 140, sortable: true },
 ];
 
 const formatYYYYMMDD = (text) => {
@@ -71,6 +72,17 @@ function SelectField({
   );
 }
 
+function statusText(accountStatus) {
+  switch (accountStatus) {
+    case "INACTIVE":
+      return "계정 활성화";
+    case "ACTIVE":
+      return "계정 비활성화";
+    default:
+      return null;
+  }
+}
+
 export default function Setting() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +105,11 @@ export default function Setting() {
   const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
   const [role, setRole] = useState("");
+
+  const activeCount = useMemo(
+    () => data.filter((x) => x.status === "ACTIVE").length,
+    [data]
+  );
 
   const DEPARTMENTS = useMemo(
     () => [
@@ -200,6 +217,8 @@ export default function Setting() {
           location: e.location ?? "",
           mail: e.email ?? "",
           role: e.role?.name ?? e.role ?? "",
+          status: e.accountStatus,
+          userId: e.user?.id,
         }))
       );
     } catch (e) {
@@ -251,30 +270,10 @@ export default function Setting() {
     }
   };
 
-  const deleteEmployee = async (item) => {
-    const id = item?.id;
-    if (!id) {
-      Alert.alert("오류", "삭제할 계정을 찾지 못했습니다.");
-      return;
-    }
-
-    setMenuVisible(false);
-    setMenuItem(null);
-
-    try {
-      await api.delete(`/employees/${id}`);
-      await fetchEmployeeList();
-      console.log("완료", "계정이 삭제되었습니다.");
-    } catch (err) {
-      console.log("status error:", err?.response?.status, err?.response?.data);
-      Alert.alert("실패", "계정 삭제에 실패했습니다.");
-    }
-  };
-
   const statusUser = async (item) => {
-    const id = item?.id;
-    if (!id) {
-      Alert.alert("오류", "비활성화할 계정을 찾지 못했습니다.");
+    const userId = item?.userId;
+    if (!userId) {
+      Alert.alert("오류", "계정(User) ID가 없습니다.");
       return;
     }
 
@@ -282,12 +281,11 @@ export default function Setting() {
     setMenuItem(null);
 
     try {
-      await api.put(`/users/${id}/status`);
+      await api.put(`/users/${userId}/status`);
       await fetchEmployeeList();
-      console.log("완료", "계정이 비활성화되었습니다.");
     } catch (err) {
       console.log("status error:", err?.response?.status, err?.response?.data);
-      Alert.alert("실패", "계정 비활성화에 실패했습니다.");
+      Alert.alert("실패", "계정 상태 변경에 실패했습니다.");
     }
   };
 
@@ -381,7 +379,7 @@ export default function Setting() {
     <View>
       <View style={styles.topBar}>
         <Text style={styles.title}>
-          직원 수({data.length}){loading ? " (로딩중...)" : ""}
+          직원 수({activeCount}){loading ? " (로딩중...)" : ""}
         </Text>
 
         <TouchableOpacity style={styles.addBtn} onPress={openCreateModal}>
@@ -438,19 +436,19 @@ export default function Setting() {
             >
               <Text>계정 수정</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.menuItem, { borderBottomWidth: 0 }]}
-              onPress={() => statusUser(menuItem)}
-            >
-              <Text>계정 비활성화</Text>
-            </TouchableOpacity>
+            {(() => {
+              const label = statusText(menuItem?.status);
+              if (!label) return null;
 
-            <TouchableOpacity
-              style={[styles.menuItem, { borderBottomWidth: 0 }]}
-              onPress={() => deleteEmployee(menuItem)}
-            >
-              <Text style={{ color: "red" }}>계정 삭제</Text>
-            </TouchableOpacity>
+              return (
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomWidth: 0 }]}
+                  onPress={() => statusUser(menuItem)}
+                >
+                  <Text>{label}</Text>
+                </TouchableOpacity>
+              );
+            })()}
           </View>
         </TouchableOpacity>
       </Modal>

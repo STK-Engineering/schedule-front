@@ -1,93 +1,86 @@
-import { useState } from "react";
-import { View } from "react-native";
+import { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-
+import { View, SafeAreaView, Platform, Dimensions } from "react-native";
 import { navigationRef } from "./src/navigation/RootNavigation";
-
-import Sidebar from "./src/components/Sidebar";
-import Header from "./src/components/Header";
-
+import { AuthContext } from "./src/context/AuthContext";
 import Login from "./src/web/Login";
 import SignUp from "./src/web/SignUp";
 import Find from "./src/web/Find";
 import Change from "./src/web/Change";
+
+import Sidebar from "./src/components/Sidebar";
+import Header from "./src/components/Header";
+
 import Schedule from "./src/web/Schedule";
 import Status from "./src/web/Status/Status";
 import StatusContent from "./src/web/Status/Content";
+import Form from "./src/web/Form";
+import Application from "./src/web/Manage/Application";
+import Setting from "./src/web/Manage/Setting";
+import Manage from "./src/web/Manage";
 import Request from "./src/web/Request/Request";
 import RequestContent from "./src/web/Request/Content";
-import Form from "./src/web/Form";
-import Application from "./src/web/Application";
-import Setting from "./src/web/Setting";
+import Edit from "./src/web/Status/Edit"
 
-const AuthStack = createStackNavigator();
+const Stack = createStackNavigator();
 
 function AuthNavigator() {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStack.Screen name="Login" component={Login} />
-      <AuthStack.Screen name="SignUp" component={SignUp} />
-      <AuthStack.Screen name="Find" component={Find} />
-      <AuthStack.Screen name="Change" component={Change} />
-    </AuthStack.Navigator>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={Login} />
+      <Stack.Screen name="SignUp" component={SignUp} />
+      <Stack.Screen name="Find" component={Find} />
+      <Stack.Screen name="Change" component={Change} />
+    </Stack.Navigator>
   );
 }
 
-const MainStack = createStackNavigator();
-
-function MainNavigator() {
+function AppNavigator() {
   return (
-    <MainStack.Navigator screenOptions={{ headerShown: false }}>
-      <MainStack.Screen name="Schedule" component={Schedule} />
-      <MainStack.Screen name="Status" component={Status} />
-      <MainStack.Screen name="StatusContent" component={StatusContent} />
-      <MainStack.Screen name="Request" component={Request} />
-      <MainStack.Screen name="RequestContent" component={RequestContent} />
-      <MainStack.Screen name="Form" component={Form} />
-      <MainStack.Screen name="Application" component={Application} />
-      <MainStack.Screen name="Setting" component={Setting} />
-    </MainStack.Navigator>
+    <Stack.Navigator
+      initialRouteName="Form"
+      screenOptions={{ headerShown: false }}
+    >
+      <Stack.Screen name="Schedule" component={Schedule} />
+      <Stack.Screen name="Status" component={Status} />
+      <Stack.Screen name="StatusContent" component={StatusContent} />
+      <Stack.Screen name="Edit" component={Edit} />
+      <Stack.Screen name="Application" component={Application} />
+      <Stack.Screen name="Setting" component={Setting} />
+      <Stack.Screen name="Form" component={Form} />
+      <Stack.Screen name="Request" component={Request} />
+      <Stack.Screen name="RequestContent" component={RequestContent} />
+      <Stack.Screen name="Manage" component={Manage} />
+    </Stack.Navigator>
   );
 }
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    setIsLoggedIn(!!token);
+  }, []);
+
   return (
-    <SafeAreaProvider>
+    <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn }}>
       <NavigationContainer ref={navigationRef}>
         <SafeAreaView style={{ flex: 1 }}>
           <Header />
 
           <View style={{ flex: 1, flexDirection: "row" }}>
             <View style={{ width: 350 }}>
-              <View style={{ width: 350, position: "relative" }}>
-                {isLoggedIn ? (
-                  <></>
-                ) : (
-                  <View
-                    style={{
-                      position: "absolute",
-                      backgroundColor: "rgba(255, 255, 255, 0.59)",
-                      zIndex: 1000,
-                      height: "100%",
-                      width: "100%",
-                    }}
-                  />
-                )}
-                <View />
-                <Sidebar />
-              </View>
+              <Sidebar />
             </View>
 
             <View style={{ flex: 1 }}>
-              {isLoggedIn ? <MainNavigator /> : <AuthNavigator />}
+              {isLoggedIn ? <AppNavigator /> : <AuthNavigator />}
             </View>
           </View>
         </SafeAreaView>
       </NavigationContainer>
-    </SafeAreaProvider>
+    </AuthContext.Provider>
   );
 }

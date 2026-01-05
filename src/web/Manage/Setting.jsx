@@ -83,6 +83,19 @@ function statusText(accountStatus) {
   }
 }
 
+function statusLabel(accountStatus) {
+  switch (accountStatus) {
+    case "ACTIVE":
+      return "활성화";
+    case "INACTIVE":
+      return "비활성화";
+    case "NOT_CREATED":
+      return "생성되지 않음";
+    default:
+      return accountStatus ?? "";
+  }
+}
+
 export default function Setting() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -353,7 +366,9 @@ export default function Setting() {
         {columns.map((col) => (
           <View key={col.key} style={[styles.cell, { width: col.width }]}>
             <Text style={styles.cellText}>
-              {typeof item[col.key] === "object"
+              {col.key === "status"
+                ? statusLabel(item.status)
+                : typeof item[col.key] === "object"
                 ? item[col.key]?.name
                 : item[col.key]}
             </Text>

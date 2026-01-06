@@ -1,8 +1,16 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { View, Text, TouchableOpacity, Image, Platform } from "react-native";
+import { useRoute } from "@react-navigation/native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  Platform,
+  Modal,
+} from "react-native";
 import { Calendar } from "react-native-big-calendar";
 import api from "../api/api";
-import department from "../../assets/icon/department.png";
+import departmentIcon from "../../assets/icon/department.png";
 
 function leaveTypeToTimeRange(leaveType) {
   switch (leaveType) {
@@ -25,16 +33,13 @@ function leaveToEvent(item) {
   const empName = item?.employee?.name ?? "이름없음";
   const deptName = item?.employee?.department?.name ?? "";
   const leaveType = item?.leaveType ?? "";
-  const reason = item?.reason ?? "";
 
   const { startH, startM, endH, endM } = leaveTypeToTimeRange(leaveType);
 
   const start = toDate(item.startDate, startH, startM);
   const end = toDate(item.endDate, endH, endM);
 
-  const title = `${empName}${deptName ? ` (${deptName})` : ""} - ${leaveType}${
-    reason ? ` / ${reason}` : ""
-  }`;
+  const title = `${empName}${deptName ? ` (${deptName})` : ""} - ${leaveType}`;
 
   return { title, start, end, isMine: item?.isMine ?? false, raw: item };
 }
@@ -67,30 +72,47 @@ const moveByMode = (date, mode, step) => {
 };
 
 export default function Schedule() {
+  const route = useRoute();
+
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+
   const [mode, setMode] = useState("month");
   const [currentDate, setCurrentDate] = useState(() =>
     normalizeForMode(new Date(), "month")
   );
-  const [events, setEvents] = useState([]);
+
+  const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const openEventModal = (event) => {
+    setSelectedEvent(event);
+    setEventModalOpen(true);
+  };
+
+  const closeEventModal = () => {
+    setEventModalOpen(false);
+    setSelectedEvent(null);
+  };
+
+  const DEFAULT_DEPARTMENTS = [
+    "MANAGEMENT",
+    "Sales&Marketing",
+    "ENGINEERING",
+    "Coordinator",
+    "Logistic&Warehouse",
+    "IT/ISO",
+  ];
+
   const [onlyMine, setOnlyMine] = useState(false);
   const [deptOpen, setDeptOpen] = useState(false);
 
   const [dragStartX, setDragStartX] = useState(null);
-
-  const departments = useMemo(
-    () => [
-      "Management",
-      "Sales&Marketing",
-      "Engineering",
-      "Coordinator",
-      "Logistic&Warehouse",
-      "IT/ISO",
-    ],
-    []
-  );
+  const [approvedLeaves, setApprovedLeaves] = useState([]);
 
   const fetchLeaves = useCallback(async () => {
+    setLoading(true);
     try {
       let res;
       let list = [];
@@ -109,10 +131,7 @@ export default function Schedule() {
 
         list = list.map((x) => ({ ...x, isMine: true }));
       } else {
-        res = await api.get("/leaves", {
-          params: { departments: selectedDept },
-        });
-
+        res = await api.get("/leaves");
         list = res.data ?? [];
       }
 
@@ -120,11 +139,31 @@ export default function Schedule() {
         (item) => item.approvalStatus === "승인"
       );
 
-      setEvents(approvedOnly.map(leaveToEvent));
+      const deptSet = new Set(DEFAULT_DEPARTMENTS);
+
+      for (const item of approvedOnly) {
+        const deptName = item?.employee?.department?.name;
+        if (deptName) deptSet.add(deptName);
+      }
+
+      const deptList = Array.from(deptSet).sort();
+      setDepartments(deptList);
+
+      const filtered =
+        selectedDept.length === 0
+          ? approvedOnly
+          : approvedOnly.filter((item) => {
+              const deptName = item?.employee?.department?.name ?? "";
+              return selectedDept.includes(deptName);
+            });
+
+      setApprovedLeaves(approvedOnly);
     } catch (e) {
       console.error("스케줄 불러오기 실패", e);
+    } finally {
+      setLoading(false);
     }
-  }, [onlyMine, selectedDept]);
+  }, [onlyMine]);
 
   useEffect(() => {
     fetchLeaves();
@@ -134,11 +173,43 @@ export default function Schedule() {
     setCurrentDate((prev) => normalizeForMode(prev, mode));
   }, [mode]);
 
-  const toggleDept = (dept) => {
+  useEffect(() => {
+    setSelectedDept((prev) => prev.filter((d) => departments.includes(d)));
+  }, [departments]);
+
+  const events = useMemo(() => {
+    const filtered =
+      selectedDept.length === 0
+        ? approvedLeaves
+        : approvedLeaves.filter((item) => {
+            const deptName = item?.employee?.department?.name ?? "";
+            return selectedDept.includes(deptName);
+          });
+
+    return filtered.map(leaveToEvent);
+  }, [approvedLeaves, selectedDept]);
+
+  const toggleDept = (deptName) => {
     setSelectedDept((prev) =>
-      prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept]
+      prev.includes(deptName)
+        ? prev.filter((d) => d !== deptName)
+        : [...prev, deptName]
     );
   };
+
+  useEffect(() => {
+    const dateStr = route?.params?.date;
+    const targetMode = route?.params?.mode;
+
+    if (dateStr) {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const nextDate = new Date(y, m - 1, d, 0, 0, 0);
+
+      if (targetMode === "day") setMode("day");
+
+      setCurrentDate(normalizeForMode(nextDate, targetMode ?? "day"));
+    }
+  }, [route?.params?.date, route?.params?.mode]);
 
   const getDeptLabel = () => {
     if (selectedDept.length === 0) return "전체";
@@ -173,6 +244,7 @@ export default function Schedule() {
 
     setDragStartX(null);
   };
+
   const onTouchStart = (e) => {
     const x = e?.nativeEvent?.pageX;
     if (typeof x === "number") setDragStartX(x);
@@ -203,16 +275,26 @@ export default function Schedule() {
       <Text style={{ fontSize: 22, fontWeight: "bold", textAlign: "center" }}>
         {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
       </Text>
-
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "flex-end",
           padding: 20,
+          position: "relative",
+          zIndex: 10,
+          elevation: 10,
         }}
       >
-        <View style={{ paddingHorizontal: 20, marginVertical: 10 }}>
+        <View
+          style={{
+            paddingHorizontal: 20,
+            marginVertical: 10,
+            position: "relative",
+            zIndex: 20,
+            elevation: 20,
+          }}
+        >
           <TouchableOpacity
             onPress={() => setDeptOpen(!deptOpen)}
             style={{
@@ -225,6 +307,8 @@ export default function Schedule() {
               flexDirection: "row",
               justifyContent: "space-between",
               backgroundColor: "white",
+              zIndex: 30,
+              elevation: 30,
             }}
           >
             <Text numberOfLines={1}>부서: {getDeptLabel()}</Text>
@@ -235,36 +319,49 @@ export default function Schedule() {
             <View
               style={{
                 position: "absolute",
+                top: 40,
+                left: 20,
                 width: 200,
-                marginTop: 40,
                 borderWidth: 1,
                 borderColor: "#E5E7EB",
                 backgroundColor: "white",
+                zIndex: 9999,
+                elevation: 9999,
               }}
             >
-              {departments.map((dept) => {
-                const isSelected = selectedDept.includes(dept);
-                return (
-                  <TouchableOpacity
-                    key={dept}
-                    onPress={() => toggleDept(dept)}
-                    style={{
-                      padding: 10,
-                      flexDirection: "row",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Image
-                      source={department}
-                      style={{ width: 18, height: 18, marginRight: 8 }}
-                      resizeMode="contain"
-                    />
-                    <Text style={{ color: isSelected ? "#2563EB" : "#6B7280" }}>
-                      {dept}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {departments.length === 0 ? (
+                <View style={{ padding: 10 }}>
+                  <Text style={{ color: "#6B7280" }}>
+                    표시할 부서가 없습니다
+                  </Text>
+                </View>
+              ) : (
+                departments.map((dept) => {
+                  const isSelected = selectedDept.includes(dept);
+                  return (
+                    <TouchableOpacity
+                      key={dept}
+                      onPress={() => toggleDept(dept)}
+                      style={{
+                        padding: 10,
+                        flexDirection: "row",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Image
+                        source={departmentIcon}
+                        style={{ width: 18, height: 18, marginRight: 8 }}
+                        resizeMode="contain"
+                      />
+                      <Text
+                        style={{ color: isSelected ? "#2563EB" : "#6B7280" }}
+                      >
+                        {dept}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </View>
           )}
         </View>
@@ -280,6 +377,7 @@ export default function Schedule() {
             borderWidth: 1,
             borderColor: "#E5E7EB",
           }}
+          disabled={loading}
         >
           <Text>{onlyMine ? "전체 일정 보기" : "내 일정만 보기"}</Text>
         </TouchableOpacity>
@@ -305,9 +403,8 @@ export default function Schedule() {
           ))}
         </View>
       </View>
-
       <View
-        style={{ flex: 1 }}
+        style={{ flex: 1, zIndex: 0 }}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
         onTouchStart={onTouchStart}
@@ -320,10 +417,89 @@ export default function Schedule() {
           date={currentDate}
           swipeEnabled={false}
           eventCellStyle={(e) => ({
-            backgroundColor: e.isMine ? "#2563EB" : "#9CA3AF",
+            backgroundColor:  "#9CA3AF",
           })}
+          onPressEvent={openEventModal}
         />
       </View>
+      <Modal
+        visible={eventModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEventModal}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={closeEventModal}
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              backgroundColor: "white",
+              borderRadius: 16,
+              padding: 16,
+            }}
+          >
+            <Text
+              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
+            >
+              일정 상세
+            </Text>
+
+            <Text style={{ marginBottom: 6 }}>
+              <Text style={{ fontWeight: "bold" }}>제목: </Text>
+              {selectedEvent?.title ?? "-"}
+            </Text>
+
+            <Text style={{ marginBottom: 6 }}>
+              <Text style={{ fontWeight: "bold" }}>시작: </Text>
+              {selectedEvent?.start
+                ? new Date(selectedEvent.start).toLocaleString()
+                : "-"}
+            </Text>
+
+            <Text style={{ marginBottom: 6 }}>
+              <Text style={{ fontWeight: "bold" }}>종료: </Text>
+              {selectedEvent?.end
+                ? new Date(selectedEvent.end).toLocaleString()
+                : "-"}
+            </Text>
+
+            <Text style={{ marginBottom: 6 }}>
+              <Text style={{ fontWeight: "bold" }}>사유: </Text>
+              {selectedEvent?.raw?.reason ?? "-"}
+            </Text>
+
+            <Text style={{ marginBottom: 14 }}>
+              <Text style={{ fontWeight: "bold" }}>휴가 종류: </Text>
+              {selectedEvent?.raw?.leaveType ?? "-"}
+            </Text>
+
+            <TouchableOpacity
+              onPress={closeEventModal}
+              style={{
+                alignSelf: "flex-end",
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                backgroundColor: "#305685",
+              }}
+            >
+              <Text style={{ color: "white", fontWeight: "bold" }}>닫기</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

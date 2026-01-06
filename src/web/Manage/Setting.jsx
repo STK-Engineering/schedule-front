@@ -13,12 +13,12 @@ import {
 import api from "../../api/api";
 
 const columns = [
-  { key: "name", title: "이름", width: 90, sortable: true },
-  { key: "department", title: "부서", width: 150, sortable: true },
-  { key: "position", title: "직급", width: 80, sortable: true },
-  { key: "date", title: "입사일", width: 130, sortable: true },
-  { key: "location", title: "근무지", width: 80, sortable: true },
-  { key: "mail", title: "메일", width: 200, sortable: true },
+  { key: "name", title: "이름", width: 95, sortable: true },
+  { key: "department", title: "부서", width: 155, sortable: true },
+  { key: "position", title: "직급", width: 90, sortable: true },
+  { key: "date", title: "입사일", width: 140, sortable: true },
+  { key: "location", title: "근무지", width: 83, sortable: true },
+  { key: "mail", title: "메일", width: 203, sortable: true },
   { key: "role", title: "권한", width: 120, sortable: true },
   { key: "status", title: "상태", width: 140, sortable: true },
 ];
@@ -121,6 +121,16 @@ export default function Setting() {
 
   const activeCount = useMemo(
     () => data.filter((x) => x.status === "ACTIVE").length,
+    [data]
+  );
+
+  const inactiveCount = useMemo(
+    () => data.filter((x) => x.status === "INACTIVE").length,
+    [data]
+  );
+
+  const notCreatedCount = useMemo(
+    () => data.filter((x) => x.status === "NOT_CREATED").length,
     [data]
   );
 
@@ -401,6 +411,13 @@ export default function Setting() {
           <Text style={styles.addBtnText}>계정 추가</Text>
         </TouchableOpacity>
       </View>
+      <View style={styles.subCountsRow}>
+        <Text style={styles.subCountText}>활성화 : {activeCount}</Text>
+        <Text style={styles.subCountText}>비활성화 : {inactiveCount}</Text>
+        <Text style={styles.subCountText}>
+          생성되지 않음 : {notCreatedCount}
+        </Text>
+      </View>
 
       {!!error && (
         <Text style={{ color: "red", marginBottom: 10 }}>{error}</Text>
@@ -641,7 +658,7 @@ const styles = StyleSheet.create({
   headerText: { fontWeight: "600" },
   cellText: { color: "#333" },
 
-  checkboxCell: { width: 50, alignItems: "center", justifyContent: "center" },
+  checkboxCell: { alignItems: "center", justifyContent: "center" },
 
   menuCell: {
     width: 40,
@@ -744,4 +761,17 @@ const styles = StyleSheet.create({
 
   cancelText: { color: "#305685", fontWeight: "600", textAlign: "center" },
   confirmText: { color: "#FFF", fontWeight: "600", textAlign: "center" },
+
+  subCountsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: -6,
+    marginBottom: 12,
+  },
+
+  subCountText: {
+    color: "#64748B",
+    fontSize: 13,
+  },
 });

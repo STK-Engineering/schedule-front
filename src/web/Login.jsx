@@ -1,172 +1,113 @@
-import React, { useState } from "react";
-import axios from "axios";
-import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
+import React, { useState, useContext } from "react";
+import { View, Text, TextInput, TouchableOpacity } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { AuthContext } from "../context/AuthContext";
+import api from "../api/api";
 
 export default function Login() {
   const navigation = useNavigation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const api = axios.create({
-    baseURL: "https://schedule.stkkr.com",
-    timeout: 5000,
-    withCredentials: true,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+  const [loginError, setLoginError] = useState(""); 
+  const { setIsLoggedIn } = useContext(AuthContext);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("알림", "이메일과 비밀번호를 입력해주세요");
-
-      navigation.navigate("Form");
+      setLoginError("이메일과 비밀번호를 입력해주세요");
       return;
     }
 
     try {
       const response = await api.post("/auth/login", {
         email,
-        password
+        password,
       });
 
-      console.log("로그인 성공:", response.data);
+      const { token } = response.data;
 
-      navigation.navigate("Form");
+      localStorage.setItem("token", token);
+      window.location.replace("/");
+      setIsLoggedIn(true);
+      setLoginError(""); 
     } catch (error) {
-      console.log("error message:", error.message);
-      console.log("error request:", error.request);
-      Alert.alert(
-        "로그인 실패",
-        error.response?.data?.message || error.message
+      setLoginError(
+        error.response?.data?.message ||
+          "이메일 또는 비밀번호가 일치하지 않습니다"
       );
     }
   };
 
   return (
-    <View
-      style={{
-        flex: 1,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
       <View
         style={{
           width: "40%",
           height: "50%",
-          justifyContent: "center",
-          alignItems: "center",
           padding: 40,
           borderRadius: 12,
           backgroundColor: "white",
         }}
       >
-        <Text style={{ fontSize: 19, fontWeight: 500, marginBottom: 30 }}>
+        <Text style={{ fontSize: 19, fontWeight: "500", marginBottom: 30 }}>
           로그인 후 이용 가능한 서비스입니다.
         </Text>
 
-        <View
-          style={{
-            width: "100%",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
+        <Text>이메일</Text>
+        <TextInput
+          style={inputStyle}
+          placeholder="이메일을 입력해주세요."
+          autoCapitalize="none"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            setLoginError(""); 
           }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
-            이메일
-          </Text>
-          <TextInput
-            style={{
-              width: "100%",
-              borderWidth: 1,
-              borderColor: "#121D6D",
-              padding: 14,
-              marginBottom: 10,
-              borderRadius: 8,
-            }}
-            placeholder="이메일을 입력해주세요."
-            autoCapitalize="none"
-            value={email}
-            onChangeText={(text) => setEmail(text)}
-          />
-        </View>
-        <View
-          style={{
-            width: "100%",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-          }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
-            비밀번호
-          </Text>
-          <TextInput
-            style={{
-              width: "100%",
-              borderWidth: 1,
-              borderColor: "#121D6D",
-              padding: 14,
-              marginBottom: 14,
-              borderRadius: 8,
-            }}
-            placeholder="비밀번호를 입력해주세요."
-            ssecureTextEntry
-            value={password}
-            onChangeText={(text) => setPassword(text)}
-          />
-        </View>
+        />
 
-        <TouchableOpacity
-          style={{
-            backgroundColor: "#121D6D",
-            width: "100%",
-            borderWidth: 1,
-            borderColor: "#121D6D",
-            paddingVertical: 16,
-            borderRadius: 8,
+        <Text>비밀번호</Text>
+        <TextInput
+          style={inputStyle}
+          placeholder="비밀번호를 입력해주세요."
+          secureTextEntry
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            setLoginError(""); 
           }}
-          onPress={handleLogin}
-        >
+        />
+
+        {loginError ? (
+          <Text
+            style={{
+              color: "red",
+              fontSize: 12,
+              marginBottom: 12,
+              marginTop: -4,
+            }}
+          >
+            {loginError}
+          </Text>
+        ) : null}
+
+        <TouchableOpacity style={buttonStyle} onPress={handleLogin}>
           <Text style={{ color: "white", textAlign: "center" }}>로그인</Text>
         </TouchableOpacity>
 
         <View
           style={{
             marginTop: 35,
-            display: "flex",
             flexDirection: "row",
             gap: 30,
             alignItems: "center",
           }}
         >
-          <TouchableOpacity
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-            onPress={() => navigation.navigate("Find")}
-          >
+          <TouchableOpacity onPress={() => navigation.navigate("Find")}>
             <Text style={{ color: "#121D6D", fontSize: 16 }}>
               비밀번호 찾기
             </Text>
           </TouchableOpacity>
-          <View
-            style={{ height: "100%", width: 1, backgroundColor: "#A5A5A5" }}
-          />
-          <TouchableOpacity
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-            onPress={() => navigation.navigate("SignUp")}
-          >
+          <View style={{ height: "100%", width: 1, backgroundColor: "#A5A5A5" }} />
+          <TouchableOpacity onPress={() => navigation.navigate("SignUp")}>
             <Text style={{ color: "#121D6D", fontSize: 16 }}>회원가입</Text>
           </TouchableOpacity>
         </View>
@@ -174,3 +115,19 @@ export default function Login() {
     </View>
   );
 }
+
+const inputStyle = {
+  width: "100%",
+  borderWidth: 1,
+  borderColor: "#121D6D",
+  padding: 14,
+  marginBottom: 10,
+  borderRadius: 8,
+};
+
+const buttonStyle = {
+  backgroundColor: "#121D6D",
+  width: "100%",
+  paddingVertical: 16,
+  borderRadius: 8,
+};

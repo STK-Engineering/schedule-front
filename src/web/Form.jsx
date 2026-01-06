@@ -9,6 +9,7 @@ import {
   ScrollView,
   Image,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
 import Checkbox from "expo-checkbox";
 import category from "../../assets/icon/category.png";
@@ -17,6 +18,8 @@ import time from "../../assets/icon/time.png";
 import other from "../../assets/icon/etc.png";
 
 export default function Form() {
+  const navigation = useNavigation();
+
   const [leaveType, setLeaveType] = useState("연차");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -25,6 +28,9 @@ export default function Form() {
   const [isChecked, setChecked] = useState(false);
   const [diffDay, setDiffDay] = useState(null);
   const [attemptedCheck, setAttemptedCheck] = useState(false);
+  const [balances, setBalances] = useState({ totalDays: 0, remainingDays: 0 });
+  const [balancesLoading, setBalancesLoading] = useState(true);
+  const [employee, setEmployee] = useState({ name: "", department: "" });
 
   const sendDateForm = async () => {
     if (!isChecked) return;
@@ -41,6 +47,7 @@ export default function Form() {
     try {
       const response = await api.post("/leaves", payload);
       console.log("신청 성공", response.data);
+      navigation.navigate("Status");
     } catch (err) {
       console.error("신청 실패", err);
     }
@@ -72,7 +79,11 @@ export default function Form() {
   }, [startDate, endDate, leaveType]);
 
   const isFormValid =
-    leaveType && startDate && endDate && reason.trim().length > 0 && etc.trim().length > 0;
+    leaveType &&
+    startDate &&
+    endDate &&
+    reason.trim().length > 0 &&
+    etc.trim().length > 0;
 
   useEffect(() => {
     if (!isFormValid && isChecked) {
@@ -83,6 +94,45 @@ export default function Form() {
       setAttemptedCheck(false);
     }
   }, [isFormValid, isChecked, attemptedCheck]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchBalances = async () => {
+      try {
+        setBalancesLoading(true);
+
+        const res = await api.get("/balances");
+        const data = res.data ?? {};
+
+        if (!mounted) return;
+
+        setEmployee({
+          name: data.name ?? data.employee?.name ?? "",
+          department: data.department ?? data.employee?.department?.name ?? "",
+        });
+
+        setBalances({
+          totalDays: Number(data.totalDays ?? 0),
+          remainingDays: Number(data.remainingDays ?? 0),
+        });
+      } catch (e) {
+        console.log("balances fetch error:", e);
+        if (!mounted) return;
+
+        setEmployee({ name: "", department: "" });
+        setBalances({ totalDays: 0, remainingDays: 0 });
+      } finally {
+        if (mounted) setBalancesLoading(false);
+      }
+    };
+
+    fetchBalances(); 
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -288,8 +338,8 @@ export default function Form() {
             ))}
           </View>
 
-          <FormRow label="소속" value="IT/ISO" />
-          <FormRow label="성명" value="" />
+          <FormRow label="소속" value={employee.department} />
+          <FormRow label="성명" value={employee.name} />
           <FormRow label="휴가형태" value={leaveType} />
           <FormRow
             label="기 간"
@@ -313,9 +363,11 @@ export default function Form() {
           >
             <Cell title="휴가 일수 현황" width={120} />
             <Cell title="총 휴가 일수" width={80} />
-            <Cell value="15일" />
+            <Cell value={balancesLoading ? "-" : `${balances.totalDays}일`} />
             <Cell title="잔여 일수" width={80} />
-            <Cell value="13일" />
+            <Cell
+              value={balancesLoading ? "-" : `${balances.remainingDays}일`}
+            />
           </View>
 
           {/* 날짜 */}

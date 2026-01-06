@@ -7,16 +7,18 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  Alert,
 } from "react-native";
 import api from "../../api/api";
 
 const columns = [
   { key: "name", title: "이름", width: 120, sortable: true },
-  { key: "department", title: "부서", width: 140, sortable: true },
-  { key: "type", title: "유형", width: 90, sortable: true },
-  { key: "date", title: "사용일자", width: 200, sortable: true },
-  { key: "reason", title: "사유", width: 200, sortable: true },
-  { key: "etc", title: "기타사항", width: 232, sortable: true }
+  { key: "department", title: "부서", width: 120, sortable: true },
+  { key: "type", title: "유형", width: 130, sortable: true },
+  { key: "date", title: "사용일자", width: 160, sortable: true },
+  { key: "reason", title: "사유", width: 150, sortable: true },
+  { key: "etc", title: "기타사항", width: 350, sortable: true },
 ];
 
 function formatPeriod(startDate, endDate) {
@@ -30,7 +32,9 @@ export default function Application() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sort, setSort] = useState({ key: null, direction: "asc" });
-  const [openMenuId, setOpenMenuId] = useState(null);
+
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuItem, setMenuItem] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -46,12 +50,13 @@ export default function Application() {
         if (!mounted) return;
 
         const mapped = list.map((e) => ({
+          id: e.id, 
           name: e.employee?.name ?? "-",
           department: e.employee?.department?.name ?? "-",
           type: e.leaveType ?? "-",
           date: formatPeriod(e.startDate, e.endDate),
           reason: e.reason ?? "-",
-          etc: e.etc ?? "-"
+          etc: e.etc ?? "-",
         }));
 
         setData(mapped);
@@ -59,8 +64,10 @@ export default function Application() {
         console.log("ERR message:", e?.message);
         console.log("ERR status:", e?.response?.status);
         console.log("ERR data:", e?.response?.data);
-        console.log("REQ full url:", `${e?.config?.baseURL ?? ""}${e?.config?.url ?? ""}`);
-        console.log("REQ headers:", e?.config?.headers);
+        console.log(
+          "REQ full url:",
+          `${e?.config?.baseURL ?? ""}${e?.config?.url ?? ""}`
+        );
 
         if (!mounted) return;
         setError("목록을 불러오지 못 했습니다.");
@@ -93,6 +100,35 @@ export default function Application() {
     setData(sorted);
   };
 
+  const downloadLeavePdf = async (item) => {
+    const id = item?.id;
+    if (!id) return Alert.alert("오류", "다운로드할 문서 ID가 없습니다.");
+
+    setMenuVisible(false);
+    setMenuItem(null);
+
+    try {
+      const res = await api.get(`/leaves/${id}/download`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `휴가신청_${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.log("download error:", e?.response?.status, e?.response?.data);
+      Alert.alert("실패", "PDF 다운로드에 실패했습니다.");
+    }
+  };
+
   const renderHeader = () => (
     <View style={styles.headerRow}>
       {columns.map((col) => (
@@ -116,9 +152,12 @@ export default function Application() {
     </View>
   );
 
-  const renderRow = ({ item, index }) => {
-    const isOpen = openMenuId === index;
+  const openRowMenu = (item) => {
+    setMenuItem(item);
+    setMenuVisible(true);
+  };
 
+  const renderRow = ({ item }) => {
     return (
       <View style={styles.row}>
         {columns.map((col) => (
@@ -129,24 +168,10 @@ export default function Application() {
           </View>
         ))}
 
-        <View style={styles.moreWrapper}>
-          <TouchableOpacity onPress={() => setOpenMenuId(isOpen ? null : index)}>
+        <View style={styles.menuCell}>
+          <TouchableOpacity onPress={() => openRowMenu(item)}>
             <Text style={styles.moreText}>⋮</Text>
           </TouchableOpacity>
-
-          {isOpen && (
-            <View style={styles.dropdown}>
-              <TouchableOpacity
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setOpenMenuId(null);
-                  console.log("다운로드", item.id);
-                }}
-              >
-                <Text>다운로드</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
       </View>
     );
@@ -173,7 +198,7 @@ export default function Application() {
             {renderHeader()}
             <FlatList
               data={data}
-              keyExtractor={(item) => String(item.id ?? Math.random())}
+              keyExtractor={(item) => String(item.id)}
               renderItem={renderRow}
               style={{ flex: 1 }}
               nestedScrollEnabled
@@ -185,73 +210,79 @@ export default function Application() {
           </View>
         </ScrollView>
       )}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            setMenuVisible(false);
+            setMenuItem(null);
+          }}
+        >
+          <View style={styles.menuBox}>
+            <TouchableOpacity
+              style={[styles.menuItem, { borderBottomWidth: 0 }]}
+              onPress={() => downloadLeavePdf(menuItem)}
+            >
+              <Text>다운로드</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 12,
-  },
+  title: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
+
   headerRow: {
     flexDirection: "row",
     backgroundColor: "#F4F6F8",
     borderBottomWidth: 1,
     borderColor: "#DDD",
   },
-  row: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderColor: "#EEE",
-  },
-  cell: {
-    padding: 12,
-    justifyContent: "center",
-  },
-  headerText: {
-    fontWeight: "600",
-  },
-  sortIcon: {
-    color: "#64748B",
-    fontWeight: "600",
-  },
-  cellText: {
-    color: "#333",
-  },
-  moreHeaderCell: {
-    width: 50,
-  },
-  moreWrapper: {
+  row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#EEE" },
+
+  cell: { padding: 12, justifyContent: "center" },
+  headerText: { fontWeight: "600" },
+  sortIcon: { color: "#64748B", fontWeight: "600" },
+  cellText: { color: "#333" },
+
+  moreHeaderCell: { width: 50 },
+
+  menuCell: {
     width: 50,
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
   },
-  moreText: {
-    fontSize: 18,
-    color: "#555",
-    zIndex: 1000,
-    cursor: "pointer",
+  moreText: { fontSize: 18, color: "#555" },
+
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  dropdown: {
-    position: "absolute",
-    top: 24,
-    right: 0,
-    width: 120,
+  menuBox: {
+    width: 220,
     backgroundColor: "#fff",
-    borderRadius: 8,
-    zIndex: 999,
-    elevation: 5,
+    borderRadius: 12,
+    overflow: "hidden",
+    elevation: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
   },
-  dropdownItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+  menuItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },

@@ -44,6 +44,21 @@ function leaveToEvent(item) {
   return { title, start, end, isMine: item?.isMine ?? false, raw: item };
 }
 
+const LEAVE_TYPE_STYLES = {
+  연차: { bg: "#2c7a57ff", border: "#26b472af" },
+  오전반차: { bg: "#2d82d7ff", border: "#489aa4ff"},
+  오후반차: { bg: "#515ed7ff", border: "#9294b6ff" },
+  경조사: { bg: "#b93771ff", border: "#B98A9B" },
+  기타: { bg: "#b68c29ff", border: "#C0A26E" },
+  출산: { bg: "#de869cff", border: "#C58A97" },
+};
+
+const getLeaveTypeStyle = (leaveType) =>
+  LEAVE_TYPE_STYLES[leaveType] ?? {
+    bg: "#E5E7EB",
+    border: "#9CA3AF"
+  };
+
 const addDays = (date, days) => {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
@@ -416,9 +431,16 @@ export default function Schedule() {
           mode={mode}
           date={currentDate}
           swipeEnabled={false}
-          eventCellStyle={(e) => ({
-            backgroundColor:  "#9CA3AF",
-          })}
+          eventCellStyle={(e) => {
+            const leaveType = e?.raw?.leaveType ?? "";
+            const style = getLeaveTypeStyle(leaveType);
+            return {
+              backgroundColor: style.bg,
+              borderLeftWidth: 4,
+              borderLeftColor: style.border,
+              borderRadius: 6,
+            };
+          }}
           onPressEvent={openEventModal}
         />
       </View>
@@ -445,45 +467,108 @@ export default function Schedule() {
             style={{
               width: "100%",
               maxWidth: 420,
-              backgroundColor: "white",
-              borderRadius: 16,
-              padding: 16,
+              backgroundColor: "#FFFFFF",
+              borderRadius: 18,
+              padding: 18,
+              borderWidth: 1,
+              borderColor: "#E2E8F0",
+              shadowColor: "#0F172A",
+              shadowOpacity: 0.12,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 6,
             }}
           >
-            <Text
-              style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}
-            >
-              일정 상세
-            </Text>
+            {(() => {
+              const leaveType = selectedEvent?.raw?.leaveType ?? "-";
+              const style = getLeaveTypeStyle(leaveType);
+              return (
+                <>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: style.border,
+                        }}
+                      />
+                      <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+                        일정 상세
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 999,
+                        backgroundColor: style.bg,
+                        borderWidth: 1,
+                        borderColor: style.border,
+                      }}
+                    >
+                      <Text style={{ color: style.text, fontWeight: "500", color: "#cdcdcdff" }}>
+                        {leaveType}
+                      </Text>
+                    </View>
+                  </View>
 
-            <Text style={{ marginBottom: 6 }}>
-              <Text style={{ fontWeight: "bold" }}>제목: </Text>
-              {selectedEvent?.title ?? "-"}
-            </Text>
+                  <View
+                    style={{
+                      backgroundColor: "#F8FAFC",
+                      borderRadius: 12,
+                      padding: 20,
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      gap: 8,
+                      marginBottom: 14,
+                    }}
+                  >
+                    <Text>
+                      <Text style={{ fontWeight: "bold" }}>제목: </Text>
+                      {selectedEvent?.title ?? "-"}
+                    </Text>
 
-            <Text style={{ marginBottom: 6 }}>
-              <Text style={{ fontWeight: "bold" }}>시작: </Text>
-              {selectedEvent?.start
-                ? new Date(selectedEvent.start).toLocaleString()
-                : "-"}
-            </Text>
+                    <Text>
+                      <Text style={{ fontWeight: "bold" }}>시작: </Text>
+                      {selectedEvent?.start
+                        ? new Date(selectedEvent.start).toLocaleString()
+                        : "-"}
+                    </Text>
 
-            <Text style={{ marginBottom: 6 }}>
-              <Text style={{ fontWeight: "bold" }}>종료: </Text>
-              {selectedEvent?.end
-                ? new Date(selectedEvent.end).toLocaleString()
-                : "-"}
-            </Text>
+                    <Text>
+                      <Text style={{ fontWeight: "bold" }}>종료: </Text>
+                      {selectedEvent?.end
+                        ? new Date(selectedEvent.end).toLocaleString()
+                        : "-"}
+                    </Text>
 
-            <Text style={{ marginBottom: 6 }}>
-              <Text style={{ fontWeight: "bold" }}>사유: </Text>
-              {selectedEvent?.raw?.reason ?? "-"}
-            </Text>
-
-            <Text style={{ marginBottom: 14 }}>
-              <Text style={{ fontWeight: "bold" }}>휴가 종류: </Text>
-              {selectedEvent?.raw?.leaveType ?? "-"}
-            </Text>
+                    <Text>
+                      <Text style={{ fontWeight: "bold" }}>사유: </Text>
+                      {selectedEvent?.raw?.reason ?? "-"}
+                    </Text>
+                    <Text>
+                      <Text style={{ fontWeight: "bold" }}>기타: </Text>
+                      {selectedEvent?.raw?.etc ?? "-"}
+                    </Text>
+                  </View>
+                </>
+              );
+            })()}
 
             <TouchableOpacity
               onPress={closeEventModal}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,12 +12,13 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import pdf from "../../../assets/img/pdf.png";
 import api from "../../api/api";
+import { LeaveBalanceContext } from "../../context/LeaveBalanceContext";
 
 const STATUS_STYLE = {
   승인: { bg: "#E8EDFF", text: "#121D6D", dot: "#121D6D" },
   거절: { bg: "#FFE9E7", text: "#FF2116", dot: "#FF2116" },
   대기: { bg: "#EEF2F7", text: "#475569", dot: "#64748B" },
-  반려: { bg: "#FFE9E7", text: "#FF2116", dot: "#FF2116" }, // 혹시 반려도 쓰면
+  반려: { bg: "#FFE9E7", text: "#FF2116", dot: "#FF2116" }, 
 };
 
 function formatPeriod(startDate, endDate) {
@@ -31,7 +32,6 @@ export default function Status() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ✅ AbortController로 안전하게 취소 처리 (mounted 필요 없음)
   const fetchLeaves = async (signal, { silent = false } = {}) => {
     try {
       if (!silent) setLoading(true);
@@ -66,7 +66,6 @@ export default function Status() {
         done: done.map(mapItem),
       });
     } catch (e) {
-      // ✅ 요청 취소면 무시
       if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
 
       console.log("leaves error message:", e?.message);
@@ -159,10 +158,13 @@ function Section({ title, count, emptyText, children }) {
 
 function Item({ item, onDeleted }) {
   const navigation = useNavigation();
+  const { bump } = useContext(LeaveBalanceContext);
 
   const statusTheme = STATUS_STYLE[item.status] || STATUS_STYLE["대기"];
 
-  const hidePdf = item.status === "반려" || item.status === "거절";
+  const hidePdf = item.status === "반려" || item.status === "대기" || item.status === "재대기";
+
+  const hideEdit = item.type === "경조사";
 
   const downloadPdf = async () => {
     try {
@@ -175,7 +177,7 @@ function Item({ item, onDeleted }) {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `휴가신청_${item.id}.pdf`;
+      a.download = `Leave_application_form_${item.name}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -195,6 +197,7 @@ function Item({ item, onDeleted }) {
     try {
       await api.delete(`/leaves/${item.id}`);
       Alert.alert("완료", "휴가 신청이 취소되었습니다.");
+      bump();
       onDeleted?.();
     } catch (e) {
       console.log("delete error:", e?.response?.status, e?.response?.data);
@@ -241,13 +244,15 @@ function Item({ item, onDeleted }) {
 
         <View style={{ flexDirection: "row", gap: 8 }}>
           {/* 수정 */}
-          <TouchableOpacity
-            style={[styles.pdfBtn, { paddingHorizontal: 12 }]}
-            onPress={goEdit}
-            activeOpacity={0.7}
-          >
+          {!hideEdit && (
+            <TouchableOpacity
+              style={[styles.pdfBtn, { paddingHorizontal: 12 }]}
+              onPress={goEdit}
+              activeOpacity={0.7}
+            >
             <Text style={styles.pdfText}>수정</Text>
           </TouchableOpacity>
+          )}
 
           {/* 취소 */}
           <TouchableOpacity
@@ -279,7 +284,7 @@ function Item({ item, onDeleted }) {
 }
 
 const styles = {
-  container: { flex: 1, backgroundColor: "#F6F8FB" },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
   content: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 40 },
 
   pageTitle: {

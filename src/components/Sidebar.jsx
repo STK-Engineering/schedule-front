@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
 import reqeust from "../../assets/icon/request.png";
 import setting from "../../assets/icon/setting.png";
 import api from "../api/api";
+import { LeaveBalanceContext } from "../context/LeaveBalanceContext";
 
 export default function Sidebar() {
   const navigation = useNavigation();
   const [selectedDate, setSelectedDate] = useState(null);
+  const { version } = useContext(LeaveBalanceContext);
 
   const [leave, setLeave] = useState({
     total: 0,
@@ -48,6 +50,16 @@ export default function Sidebar() {
       }
     };
 
+    fetchLeaveSummary();
+
+    return () => {
+      mounted = false;
+    };
+  }, [version]);
+
+  useEffect(() => {
+    let mounted = true;
+
     const fetchMe = async () => {
       try {
         const res = await api.get("/employees/me");
@@ -66,7 +78,6 @@ export default function Sidebar() {
       }
     };
 
-    fetchLeaveSummary();
     fetchMe();
 
     return () => {
@@ -191,6 +202,7 @@ export default function Sidebar() {
 const styles = StyleSheet.create({
   container: {
     width: 350,
+    height: "100%",
     backgroundColor: "white",
     borderRightWidth: 1,
     borderColor: "#D4D4D4",

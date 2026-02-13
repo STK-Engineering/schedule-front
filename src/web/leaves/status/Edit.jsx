@@ -258,7 +258,7 @@ export default function Edit() {
       Alert.alert("완료", "수정이 완료되었습니다.", [
         { text: "확인", onPress: () => navigation.goBack() },
       ]);
-      navigation.navigate("Status");
+      navigation.navigate("LeaveStatus");
     } catch (e) {
       console.log("update error:", e?.response?.status, e?.response?.data);
       Alert.alert("실패", "수정에 실패했습니다.");

@@ -21,10 +21,127 @@ const STATUS_STYLE = {
   반려: { bg: "#FFE9E7", text: "#FF2116", dot: "#FF2116" },
 };
 
-function formatPeriod(startDate, endDate) {
+function toDateOnly(dateStr) {
+  if (!dateStr) return null;
+  const [year, month, day] = String(dateStr).slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day, 0, 0, 0);
+}
+
+function toDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function normalizeHolidayDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return toDateKey(value);
+  const str = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+  if (/^\d{8}$/.test(str)) {
+    return `${str.slice(0, 4)}-${str.slice(4, 6)}-${str.slice(6, 8)}`;
+  }
+  return null;
+}
+
+function normalizeHolidayItems(payload) {
+  const items =
+    payload?.response?.body?.items?.item ??
+    payload?.items?.item ??
+    payload?.items ??
+    payload?.data ??
+    payload ??
+    [];
+
+  const list = Array.isArray(items) ? items : [items];
+  return list
+    .map((item) =>
+      normalizeHolidayDate(
+        item?.date ?? item?.locdate ?? item?.holidayDate ?? item?.localDate ?? item?.day ?? item,
+      ),
+    )
+    .filter(Boolean);
+}
+
+function collectYearMonthKeys(items) {
+  const keys = new Set();
+
+  for (const item of items) {
+    const start = toDateOnly(item?.startDate);
+    const end = toDateOnly(item?.endDate || item?.startDate);
+    if (!start || !end) continue;
+
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    const lastMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+
+    while (cursor <= lastMonth) {
+      keys.add(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
+  return Array.from(keys);
+}
+
+async function fetchHolidayDateSetForLeaves(items, signal) {
+  const yearMonthKeys = collectYearMonthKeys(items);
+  if (!yearMonthKeys.length) return new Set();
+
+  const responses = await Promise.all(
+    yearMonthKeys.map(async (key) => {
+      const [year, month] = key.split("-").map(Number);
+      const res = await api.get("/holiday", { params: { year, month }, signal });
+      return normalizeHolidayItems(res.data);
+    }),
+  );
+
+  return new Set(responses.flat());
+}
+
+function formatPeriodByUsedDays(startDate, endDate, holidayDateSet = new Set()) {
   if (!startDate) return "-";
   if (!endDate || endDate === startDate) return startDate;
-  return `${startDate} ~ ${endDate}`;
+
+  const start = toDateOnly(startDate);
+  const end = toDateOnly(endDate || startDate);
+  if (!start || !end || start > end) return `${startDate} ~ ${endDate || startDate}`;
+
+  const includedDates = [];
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const day = cursor.getDay();
+    const isWeekend = day === 0 || day === 6;
+    const dateKey = toDateKey(cursor);
+    const isHoliday = holidayDateSet.has(dateKey);
+    if (!isWeekend && !isHoliday) includedDates.push(dateKey);
+  }
+
+  if (!includedDates.length) return `${startDate} ~ ${endDate || startDate}`;
+  const ranges = [];
+  let rangeStart = includedDates[0];
+  let rangeEnd = includedDates[0];
+
+  for (let i = 1; i < includedDates.length; i += 1) {
+    const current = toDateOnly(includedDates[i]);
+    const previous = toDateOnly(rangeEnd);
+    const isConsecutive =
+      current &&
+      previous &&
+      (current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24) === 1;
+
+    if (isConsecutive) {
+      rangeEnd = includedDates[i];
+      continue;
+    }
+
+    ranges.push(rangeStart === rangeEnd ? rangeStart : `${rangeStart}~${rangeEnd}`);
+    rangeStart = includedDates[i];
+    rangeEnd = includedDates[i];
+  }
+
+  ranges.push(rangeStart === rangeEnd ? rangeStart : `${rangeStart}~${rangeEnd}`);
+  return ranges.join("/");
 }
 
 function displayLeaveType(type) {
@@ -46,6 +163,7 @@ function getYearFromDate(value) {
 
 export default function Status() {
   const [data, setData] = useState({ waiting: [], done: [] });
+  const [holidayDateSet, setHolidayDateSet] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -82,6 +200,15 @@ export default function Status() {
         waiting: waiting.map(mapItem),
         done: done.map(mapItem),
       });
+
+      const allItems = [...waiting, ...done].map(mapItem);
+      fetchHolidayDateSetForLeaves(allItems, signal)
+        .then((holidays) => setHolidayDateSet(holidays))
+        .catch((holidayError) => {
+          if (holidayError?.name === "CanceledError" || holidayError?.code === "ERR_CANCELED") return;
+          console.log("holiday fetch error:", holidayError);
+          setHolidayDateSet(new Set());
+        });
     } catch (e) {
       if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
 
@@ -94,6 +221,7 @@ export default function Status() {
       );
 
       setError("요청 목록을 불러오지 못 했습니다.");
+      setHolidayDateSet(new Set());
     } finally {
       if (!silent) setLoading(false);
     }
@@ -145,6 +273,7 @@ export default function Status() {
           <Item
             key={item.id}
             item={item}
+            holidayDateSet={holidayDateSet}
             onDeleted={() => fetchLeaves(undefined, { silent: true })}
           />
         ))}
@@ -159,6 +288,7 @@ export default function Status() {
           <Item
             key={item.id}
             item={item}
+            holidayDateSet={holidayDateSet}
             onDeleted={() => fetchLeaves(undefined, { silent: true })}
           />
         ))}
@@ -186,7 +316,7 @@ function Section({ title, count, emptyText, children }) {
   );
 }
 
-function Item({ item, onDeleted }) {
+function Item({ item, onDeleted, holidayDateSet }) {
   const navigation = useNavigation();
   const { bump } = useContext(LeaveBalanceContext);
 
@@ -259,7 +389,7 @@ function Item({ item, onDeleted }) {
       <View style={styles.itemLeft}>
         <Text style={styles.itemType}>{displayLeaveType(item.type)}</Text>
         <Text style={styles.itemSub}>
-          {formatPeriod(item.startDate, item.endDate)}
+          {formatPeriodByUsedDays(item.startDate, item.endDate, holidayDateSet)}
         </Text>
         <Text style={styles.itemMeta}>
           사용일수 <Text style={styles.itemMetaStrong}>{item.usedDay}</Text>

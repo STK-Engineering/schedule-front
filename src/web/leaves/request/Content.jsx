@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -27,12 +27,21 @@ function displayLeaveType(type) {
   return "경조사";
 }
 
+function formatDayValue(value) {
+  if (value == null || value === "") return "-";
+  if (typeof value === "number") return `${value}일`;
+  const text = String(value).trim();
+  if (!text) return "-";
+  return text.endsWith("일") ? text : `${text}일`;
+}
+
 export default function RequestContent({ route }) {
   const navigation = useNavigation();
   const params = route?.params ?? {};
 
   const {
     id,
+    employeeId,
     depart = "", 
     department = "",
     name = "",
@@ -41,7 +50,8 @@ export default function RequestContent({ route }) {
     startDate = "",
     endDate = "",
     usedDay = 0,
-    days, 
+    days,
+    remainingAnnual,
     reason = "기타",
     extra = "없음.",
     createdAt = "",
@@ -50,10 +60,79 @@ export default function RequestContent({ route }) {
   const deptName = department || depart || "-";
   const useDate = useMemo(() => formatPeriod(startDate, endDate), [startDate, endDate]);
   const remainDays = useMemo(() => (days ? days : `${usedDay}일`), [days, usedDay]);
+  const [resolvedRemainingAnnual, setResolvedRemainingAnnual] = useState(
+    remainingAnnual ?? null,
+  );
+  const remainingAnnualDays = useMemo(
+    () => formatDayValue(resolvedRemainingAnnual),
+    [resolvedRemainingAnnual],
+  );
   const displayType = useMemo(() => displayLeaveType(type), [type]);
 
   const [rejectReason, setRejectReason] = useState(""); 
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setResolvedRemainingAnnual(remainingAnnual ?? null);
+  }, [remainingAnnual]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchRemainingAnnual = async () => {
+      if (resolvedRemainingAnnual != null) return;
+      if (!employeeId && !name) return;
+
+      try {
+        const year = new Date().getFullYear();
+        const res = await api.get("/balances/department", {
+          params: { year },
+        });
+        const payload = res.data ?? {};
+        const list = Array.isArray(payload)
+          ? payload
+          : Object.values(payload).flatMap((group) =>
+              Array.isArray(group) ? group : [],
+            );
+
+        const matched =
+          list.find((row) => Number(row?.employee?.id) === Number(employeeId)) ??
+          list.find((row) => {
+            const rowName = String(row?.employee?.name ?? "").trim();
+            const rowDept = String(row?.employee?.department?.name ?? "").trim();
+            const rowLevel = String(row?.employee?.level ?? "").trim();
+            return (
+              rowName === String(name ?? "").trim() &&
+              rowDept === String(deptName ?? "").trim() &&
+              rowLevel === String(position ?? "").trim()
+            );
+          });
+        const value =
+          matched?.remainingDays ??
+          matched?.remainDays ??
+          matched?.remainingDay ??
+          matched?.remainDay ??
+          null;
+
+        if (mounted && value != null) {
+          setResolvedRemainingAnnual(value);
+        }
+      } catch (e) {
+        console.log(
+          "remaining annual fetch error:",
+          e?.message,
+          e?.response?.status,
+          e?.response?.data,
+        );
+      }
+    };
+
+    fetchRemainingAnnual();
+
+    return () => {
+      mounted = false;
+    };
+  }, [employeeId, resolvedRemainingAnnual]);
 
   const patchApproval = async ({ approvalStatus, rejectionReason }) => {
     const payload = {
@@ -142,6 +221,7 @@ export default function RequestContent({ route }) {
               <InfoRow label="직급" value={position || "-"} />
               <InfoRow label="휴가형태" value={displayType} />
               <InfoRow label="기간" value={useDate} />
+              <InfoRow label="남은 연차" value={remainingAnnualDays} />
               <InfoRow label="사용일" value={remainDays} />
               <InfoRow label="사유" value={reason || "기타"} />
               <InfoRow

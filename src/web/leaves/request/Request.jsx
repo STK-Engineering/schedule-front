@@ -52,6 +52,7 @@ export default function Request() {
 
       const mapped = list.map((e) => ({
         id: e.id,
+        employeeId: e.employee?.id ?? null,
         depart: e.employee?.department?.name ?? "",
         name: e.employee?.name ?? "",
         type: e.leaveType ?? "-",
@@ -61,6 +62,22 @@ export default function Request() {
         startDate: e.startDate ?? "",
         endDate: e.endDate ?? "",
         usedDay: e.usedDay ?? 0,
+        remainingAnnual:
+          e.remainingDays ??
+          e.remainDays ??
+          e.remainingDay ??
+          e.remainDay ??
+          e.employee?.remainingDays ??
+          e.employee?.remainDays ??
+          e.balance?.remainingDays ??
+          e.balance?.remainDays ??
+          e.totalDays ??
+          e.totalDay ??
+          e.employee?.totalDays ??
+          e.employee?.totalDay ??
+          e.balance?.totalDays ??
+          e.balance?.totalDay ??
+          null,
         reason: e.reason ?? "",
         extra: e.etc ?? "",
         createdAt: e.createdAt ?? "",

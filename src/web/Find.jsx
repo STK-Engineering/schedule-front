@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import axios from "axios";
 import {
   View,
   Text,
@@ -8,18 +7,11 @@ import {
   Alert
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import api from "../api/api"
 
 export default function Find() {
   const navigation = useNavigation();
   const [email, setEmail] = useState("");
-
-  const api = axios.create({
-    baseURL: "https://schedule.stkkr.com",
-    timeout: 5000,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
 
   const handleSendEmail = async () => {
       if (!email) {
@@ -97,6 +89,8 @@ export default function Find() {
               borderColor: "#121D6D",
               padding: 14,
               borderRadius: 8,
+              outlineStyle: "none",
+              outlineWidth: 0,
             }}
             placeholder="이메일 주소를 입력해주세요."
             value={email}

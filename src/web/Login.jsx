@@ -8,7 +8,8 @@ export default function Login() {
   const navigation = useNavigation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState(""); 
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const { setIsLoggedIn } = useContext(AuthContext);
 
   const handleLogin = async () => {
@@ -28,7 +29,7 @@ export default function Login() {
       localStorage.setItem("token", token);
       window.location.replace("/");
       setIsLoggedIn(true);
-      setLoginError(""); 
+      setLoginError("");
     } catch (error) {
       setLoginError(
         error.response?.data?.message ||
@@ -60,21 +61,31 @@ export default function Login() {
           value={email}
           onChangeText={(text) => {
             setEmail(text);
-            setLoginError(""); 
+            setLoginError("");
           }}
         />
 
         <Text>비밀번호</Text>
-        <TextInput
-          style={inputStyle}
-          placeholder="비밀번호를 입력해주세요."
-          secureTextEntry
-          value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            setLoginError(""); 
-          }}
-        />
+        <View style={passwordFieldStyle}>
+          <TextInput
+            style={[inputStyle, passwordInputStyle]}
+            placeholder="비밀번호를 입력해주세요."
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              setLoginError("");
+            }}
+          />
+          <TouchableOpacity
+            style={passwordToggleStyle}
+            onPress={() => setShowPassword((prev) => !prev)}
+          >
+            <Text style={{ color: "#121D6D" }}>
+              {showPassword ? "숨기기" : "보기"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {loginError ? (
           <Text
@@ -98,7 +109,7 @@ export default function Login() {
             marginTop: 35,
             flexDirection: "row",
             gap: 30,
-            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           <TouchableOpacity onPress={() => navigation.navigate("Find")}>
@@ -106,7 +117,9 @@ export default function Login() {
               비밀번호 찾기
             </Text>
           </TouchableOpacity>
-          <View style={{ height: "100%", width: 1, backgroundColor: "#A5A5A5" }} />
+          <View
+            style={{ height: "100%", width: 1, backgroundColor: "#A5A5A5" }}
+          />
           <TouchableOpacity onPress={() => navigation.navigate("SignUp")}>
             <Text style={{ color: "#121D6D", fontSize: 16 }}>회원가입</Text>
           </TouchableOpacity>
@@ -123,6 +136,8 @@ const inputStyle = {
   padding: 14,
   marginBottom: 10,
   borderRadius: 8,
+  outlineStyle: "none",
+  outlineWidth: 0,
 };
 
 const buttonStyle = {
@@ -130,4 +145,20 @@ const buttonStyle = {
   width: "100%",
   paddingVertical: 16,
   borderRadius: 8,
+  marginTop: 5
+};
+
+const passwordFieldStyle = {
+  position: "relative",
+  width: "100%",
+};
+
+const passwordInputStyle = {
+  paddingRight: 70,
+};
+
+const passwordToggleStyle = {
+  position: "absolute",
+  right: 14,
+  top: 14,
 };

@@ -1,21 +1,13 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import api from "../api/api";
 
 export default function SignUp() {
   const navigation = useNavigation();
   const [email, setEmail] = useState("");
-  const [authCode, setauthCode] = useState("");
+  const [authCode, setAuthCode] = useState("");
   const [password, setPassword] = useState("");
-
-  const api = axios.create({
-    baseURL: "https://schedule.stkkr.com",
-    timeout: 5000,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
 
   const handleSignUp = async () => {
     if (!email || !authCode || !password) {
@@ -122,6 +114,8 @@ export default function SignUp() {
                   borderColor: "#121D6D",
                   padding: 14,
                   borderRadius: 8,
+                  outlineStyle: "none",
+                  outlineWidth: 0,
                 }}
                 placeholder="이메일 주소를 입력해주세요."
                 value={email}
@@ -151,10 +145,12 @@ export default function SignUp() {
               padding: 14,
               marginBottom: 10,
               borderRadius: 8,
+              outlineStyle: "none",
+              outlineWidth: 0,
             }}
             placeholder="인증번호를 입력해주세요."
             value={authCode}
-            onChangeText={(text) => setauthCode(text)}
+            onChangeText={(text) => setAuthCode(text)}
           />
           <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
             비밀번호
@@ -167,6 +163,8 @@ export default function SignUp() {
               padding: 14,
               marginBottom: 14,
               borderRadius: 8,
+              outlineStyle: "none",
+              outlineWidth: 0,
             }}
             placeholder="비밀번호를 입력해주세요."
             value={password}
@@ -199,21 +197,8 @@ export default function SignUp() {
             }}
           >
             <Text style={{ fontSize: 16 }}>이미 계정이 있으신가요?</Text>
-            <TouchableOpacity
-              style={{
-                borderWidth: 1,
-                borderColor: "#121D6D",
-                backgroundColor: "#121D6D",
-                paddingHorizontal: 45,
-                paddingVertical: 10,
-                borderRadius: 8,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-              onPress={() => navigation.navigate("Login")}
-            >
-              <Text style={{ color: "white" }}>로그인</Text>
+            <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+              <Text style={{  color: "#121D6D", fontSize: 16 }}>로그인</Text>
             </TouchableOpacity>
           </View>
         </View>

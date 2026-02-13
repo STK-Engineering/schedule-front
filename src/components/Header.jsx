@@ -13,6 +13,7 @@ import Logo from "../../assets/logo/logo.png";
 import { useNavigation } from "@react-navigation/native";
 import { AuthContext } from "../context/AuthContext";
 import api, { getTokenExpiryMs } from "../api/api";
+import { navigate as navigateRoot } from "../navigation/RootNavigation";
 
 export default function Header({ onToggleSidebar }) {
   const HEADER_HEIGHT = 70;
@@ -146,6 +147,11 @@ export default function Header({ onToggleSidebar }) {
   const goSchedule = () => {
     navigation.navigate("Schedule");
   }
+
+  const goLogin = () => {
+    navigateRoot("Login");
+    navigation.navigate("Login");
+  };
 
   const normalizeAuthority = (value) => {
     const raw = String(value ?? "").trim().toLowerCase();
@@ -527,7 +533,7 @@ export default function Header({ onToggleSidebar }) {
         ) : null}
 
         <TouchableOpacity
-          onPress={goSchedule}
+          onPress={isLoggedIn ? goSchedule : goLogin}
           style={{
             backgroundColor: isLoggedIn ? "#ffffff" : "#121D6D",
             borderColor: isLoggedIn ? "#000000ff" : "#121D6D",

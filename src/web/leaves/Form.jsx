@@ -34,6 +34,109 @@ const htmlInputStyle = {
   outline: "none",
 };
 
+function toDateOnly(dateStr) {
+  if (!dateStr) return null;
+  const [year, month, day] = String(dateStr).slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day, 0, 0, 0);
+}
+
+function toDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function normalizeHolidayDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return toDateKey(value);
+  const str = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+  if (/^\d{8}$/.test(str)) return `${str.slice(0, 4)}-${str.slice(4, 6)}-${str.slice(6, 8)}`;
+  return null;
+}
+
+function normalizeHolidayItems(payload) {
+  const items =
+    payload?.response?.body?.items?.item ??
+    payload?.items?.item ??
+    payload?.items ??
+    payload?.data ??
+    payload ??
+    [];
+  const list = Array.isArray(items) ? items : [items];
+  return list
+    .map((item) =>
+      normalizeHolidayDate(
+        item?.date ?? item?.locdate ?? item?.holidayDate ?? item?.localDate ?? item?.day ?? item,
+      ),
+    )
+    .filter(Boolean);
+}
+
+function collectYearMonthKeys(startDate, endDate) {
+  const start = toDateOnly(startDate);
+  const end = toDateOnly(endDate || startDate);
+  if (!start || !end) return [];
+
+  const keys = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const lastMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+
+  while (cursor <= lastMonth) {
+    keys.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`);
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return keys;
+}
+
+function formatPeriodByUsedDays(startDate, endDate, holidayDateSet = new Set()) {
+  if (!startDate) return "-";
+  if (!endDate || endDate === startDate) return startDate;
+
+  const start = toDateOnly(startDate);
+  const end = toDateOnly(endDate || startDate);
+  if (!start || !end || start > end) return `${startDate} ~ ${endDate || startDate}`;
+
+  const includedDates = [];
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const day = cursor.getDay();
+    const isWeekend = day === 0 || day === 6;
+    const dateKey = toDateKey(cursor);
+    const isHoliday = holidayDateSet.has(dateKey);
+    if (!isWeekend && !isHoliday) includedDates.push(dateKey);
+  }
+
+  if (!includedDates.length) return `${startDate} ~ ${endDate || startDate}`;
+
+  const ranges = [];
+  let rangeStart = includedDates[0];
+  let rangeEnd = includedDates[0];
+
+  for (let i = 1; i < includedDates.length; i += 1) {
+    const current = toDateOnly(includedDates[i]);
+    const previous = toDateOnly(rangeEnd);
+    const isConsecutive =
+      current &&
+      previous &&
+      (current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24) === 1;
+
+    if (isConsecutive) {
+      rangeEnd = includedDates[i];
+      continue;
+    }
+
+    ranges.push(rangeStart === rangeEnd ? rangeStart : `${rangeStart}~${rangeEnd}`);
+    rangeStart = includedDates[i];
+    rangeEnd = includedDates[i];
+  }
+
+  ranges.push(rangeStart === rangeEnd ? rangeStart : `${rangeStart}~${rangeEnd}`);
+  return ranges.join("/");
+}
+
 export default function Form() {
   const navigation = useNavigation();
   const route = useRoute();
@@ -52,6 +155,7 @@ export default function Form() {
   const [balancesLoading, setBalancesLoading] = useState(true);
   const [spouseMaternityEligible, setSpouseMaternityEligible] = useState(false);
   const [employee, setEmployee] = useState({ name: "", department: "" });
+  const [holidayDateSet, setHolidayDateSet] = useState(new Set());
   const preselectLeaveType = route?.params?.preselectLeaveType;
 
   useEffect(() => {
@@ -181,6 +285,11 @@ export default function Form() {
     endDate &&
     reason.trim().length > 0;
 
+  const previewPeriod = useMemo(
+    () => formatPeriodByUsedDays(startDate, endDate, holidayDateSet),
+    [startDate, endDate, holidayDateSet],
+  );
+
   useEffect(() => {
     if (!isFormValid && isChecked) {
       setChecked(false);
@@ -252,6 +361,39 @@ export default function Form() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchHolidays = async () => {
+      try {
+        const yearMonthKeys = collectYearMonthKeys(startDate, endDate);
+        if (!yearMonthKeys.length) {
+          if (mounted) setHolidayDateSet(new Set());
+          return;
+        }
+
+        const responses = await Promise.all(
+          yearMonthKeys.map(async (key) => {
+            const [year, month] = key.split("-").map(Number);
+            const res = await api.get("/holiday", { params: { year, month } });
+            return normalizeHolidayItems(res.data);
+          }),
+        );
+
+        if (mounted) setHolidayDateSet(new Set(responses.flat()));
+      } catch (e) {
+        console.log("holiday fetch error:", e);
+        if (mounted) setHolidayDateSet(new Set());
+      }
+    };
+
+    fetchHolidays();
+
+    return () => {
+      mounted = false;
+    };
+  }, [startDate, endDate]);
 
   useEffect(() => {
     let mounted = true;
@@ -489,7 +631,7 @@ export default function Form() {
             <PreviewRow label="휴가형태" value={leaveType || "-"} />
             <PreviewRow
               label="기 간"
-              value={`${startDate || "-"} ~ ${endDate || "-"}`}
+              value={previewPeriod}
             />
             <PreviewRow label="사유" value={reason || "-"} />
             <PreviewRow label="기타 사항" value={etc || "-"} multiline />

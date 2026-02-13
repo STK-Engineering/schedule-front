@@ -1,61 +1,25 @@
-import React, { useContext, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
+import React, { useContext, useEffect, useState, useRef } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Calendar } from "react-native-calendars";
-import reqeust from "../../assets/icon/request.png";
-import setting from "../../assets/icon/setting.png";
 import api from "../api/api";
-import { LeaveBalanceContext } from "../context/LeaveBalanceContext";
+import { AuthContext } from "../context/AuthContext";
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed = false, onRequestClose }) {
   const navigation = useNavigation();
-  const [selectedDate, setSelectedDate] = useState(null);
-  const { version } = useContext(LeaveBalanceContext);
-
-  const [leave, setLeave] = useState({
-    total: 0,
-    used: 0,
-    remaining: 0,
-  });
-  const [loading, setLoading] = useState(true);
-
-  const [role, setRole] = useState(null);
+  const { setIsLoggedIn } = useContext(AuthContext) ?? {};
+  const [authorities, setAuthorities] = useState([]);
   const [isLoggedOut, setIsLoggedOut] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchLeaveSummary = async () => {
-      try {
-        setLoading(true);
-
-        const res = await api.get("/balances");
-        const data = res.data;
-
-        if (!mounted) return;
-
-        setLeave({
-          total: Number(data.totalDays ?? 0),
-          used: Number(data.usedDays ?? 0),
-          remaining: Number(data.remainingDays ?? 0),
-        });
-      } catch (e) {
-        console.log(
-          "leave fetch error:",
-          e?.response?.status,
-          e?.response?.data
-        );
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    fetchLeaveSummary();
-
-    return () => {
-      mounted = false;
-    };
-  }, [version]);
+  const [openSections, setOpenSections] = useState({
+    mypage: true,
+    leave: true,
+  });
+  const panelAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -67,13 +31,33 @@ export default function Sidebar() {
 
         if (!mounted) return;
 
-        setRole(String(data?.role ?? "").toLowerCase());
+        const rawAuthorities = data?.roles ?? [];
+        const normalized = Array.isArray(rawAuthorities)
+          ? rawAuthorities
+              .flatMap((item) => {
+                if (!item) return [];
+                if (typeof item === "string") return [item];
+                return [item.authorityName, item.name, item.authority].filter(
+                  Boolean
+                );
+              })
+              .map((v) => String(v).toLowerCase())
+          : [rawAuthorities].flatMap((v) => {
+              if (!v) return [];
+              return String(v)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((s) => s.toLowerCase());
+            });
+
+        setAuthorities(normalized);
         setIsLoggedOut(false);
       } catch (e) {
         console.log("me fetch error:", e?.response?.status, e?.response?.data);
         if (!mounted) return;
 
-        setRole(null);
+        setAuthorities([]);
         setIsLoggedOut(true);
       }
     };
@@ -85,218 +69,192 @@ export default function Sidebar() {
     };
   }, []);
 
-  const canSeeRequest = role === "admin" || role === "manager";
-  const canSeeManage = role === "admin";
+  useEffect(() => {
+    if (collapsed) {
+      Animated.timing(panelAnim, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+    panelAnim.setValue(0);
+    Animated.timing(panelAnim, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [collapsed, panelAnim]);
+
+  const hasAuthority = (target) =>
+    authorities.some(
+      (auth) => auth === target || auth === `role_${target}`
+    );
+  const canSeeManager = hasAuthority("manager");
+  const canSeeAdmin = hasAuthority("admin");
+
+  const menuSections = [
+    {
+      id: "leave",
+      title: "휴가",
+      items: [
+        { label: "휴가 신청", route: "LeaveForm", visible: true },
+        { label: "내 휴가 신청 내역", route: "LeaveStatus", visible: true },
+        { label: "휴가 결재 요청", route: "LeaveRequest", visible: canSeeManager },
+        { label: "승인된 휴가", route: "LeaveApplication", visible: canSeeAdmin },
+      ].filter((item) => item.visible),
+    },
+    {
+      id: "overtime",
+      title: "연장 근로",
+      items: [
+        { label: "연장 근로 신청", route: "OverTimeForm", visible: true },
+        { label: "내 연장 근로 신청 내역", route: "OverTimeStatus", visible: true },
+        {
+          label: "연장 근로 결재 요청",
+          route: "OverTimeRequest",
+          visible: canSeeManager,
+        },
+        {
+        label: "승인된 연장 근로",
+        route: "OverTimeApplication",
+        visible: canSeeAdmin,
+      },
+    ].filter((item) => item.visible),
+  },
+    {
+      id: "admin",
+      title: "어드민",
+      visible: canSeeAdmin,
+      items: [
+        {
+          label: "사용자 관리",
+          route: "Setting"
+        },
+        {
+          label: "연차 현황 관리",
+          route: "DepartmentLeave",
+        },
+        {
+          label: "결재 라인 관리",
+          route: "ApprovalLine",
+        },
+      ],
+    },
+  ].filter((section) => section.visible !== false);
+
+  const toggleSection = (id) => {
+    setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleMenuPress = (item) => {
+    if (item.action) {
+      item.action();
+      return;
+    }
+    if (item.route) {
+      navigation.navigate(item.route);
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      {/* 버튼 */}
-      <View style={styles.topButtonsWrap}>
-        <TouchableOpacity
-          style={styles.leftButton}
-          onPress={() => navigation.navigate("Form")}
-          disabled={isLoggedOut}
-        >
-          <Text style={styles.topButtonText}>연차 쓰기</Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        <TouchableOpacity
-          style={styles.rightButton}
-          onPress={() => navigation.navigate("Status")}
-          disabled={isLoggedOut}
-        >
-          <Text style={styles.topButtonText}>진행 상황</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 달력 */}
-      <View style={styles.calendarWrap}>
-        <Calendar
-          style={{ height: 350 }}
-          onDayPress={(day) => {
-            if (isLoggedOut) return;
-            setSelectedDate(day.dateString);
-
-            navigation.navigate("Schedule", {
-              date: day.dateString,
-              mode: "day",
-            });
-          }}
-          markedDates={
-            selectedDate
-              ? {
-                  [selectedDate]: { selected: true },
-                }
-              : undefined
-          }
-        />
-      </View>
-
-      {/* 연차 조회 */}
-      <View>
-        <View style={styles.leaveHeader}>
-          <Text style={styles.leaveHeaderText}>연차 조회</Text>
-        </View>
-
-        <View style={styles.leaveBody}>
-          <View style={styles.leaveCol}>
-            <Text>총 연차</Text>
-            <Text style={styles.leaveValue}>
-              {loading ? "-" : `${leave.total}일`}
-            </Text>
+    <Animated.View
+      pointerEvents={collapsed ? "none" : "auto"}
+      style={[
+        styles.overlayPanel,
+        {
+          opacity: panelAnim,
+          transform: [
+            {
+              translateX: panelAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-8, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+      onMouseLeave={() => {
+        if (!collapsed) onRequestClose?.();
+      }}
+    >
+      <View style={styles.menuList}>
+        {menuSections.map((section) => (
+          <View key={section.id} style={styles.menuSection}>
+            <TouchableOpacity
+              style={styles.menuSectionHeader}
+              onPress={() => toggleSection(section.id)}
+            >
+              <Text style={styles.menuSectionTitle}>{section.title}</Text>
+              <Text style={styles.menuSectionArrow}>
+                {openSections[section.id] ? "▾" : "▸"}
+              </Text>
+            </TouchableOpacity>
+            {openSections[section.id] &&
+              section.items.map((item) => (
+                <TouchableOpacity
+                  key={item.route ?? item.label}
+                  style={styles.menuItem}
+                  onPress={() => handleMenuPress(item)}
+                >
+                  <Text style={styles.menuItemText}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
           </View>
-
-          <View style={styles.leaveVLine} />
-
-          <View style={styles.leaveCol}>
-            <Text>사용 일수</Text>
-            <Text style={styles.leaveValue}>
-              {loading ? "-" : `${leave.used}일`}
-            </Text>
-          </View>
-
-          <View style={styles.leaveVLine} />
-
-          <View style={styles.leaveCol}>
-            <Text>잔여 일수</Text>
-            <Text style={styles.leaveValue}>
-              {loading ? "-" : `${leave.remaining}일`}
-            </Text>
-          </View>
-        </View>
-
-        {canSeeRequest && (
-          <TouchableOpacity
-            style={styles.menuBtn}
-            onPress={() => navigation.navigate("Request")}
-            disabled={isLoggedOut}
-          >
-            <Image source={reqeust} style={{ width: 20, height: 20 }} />
-            <Text style={styles.menuBtnText}>요청 현황</Text>
-          </TouchableOpacity>
-        )}
-
-        {canSeeManage && (
-          <TouchableOpacity
-            style={styles.menuBtn}
-            onPress={() => navigation.navigate("Manage")}
-            disabled={isLoggedOut}
-          >
-            <Image source={setting} style={{ width: 20, height: 20 }} />
-            <Text style={styles.menuBtnText}>신청서 / 계정 관리</Text>
-          </TouchableOpacity>
-        )}
+        ))}
       </View>
-
-      {isLoggedOut && (
-        <View style={styles.lockOverlay} pointerEvents="auto">
-          <Text style={styles.lockText}>로그인 후 이용 가능합니다</Text>
-        </View>
-      )}
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: 350,
-    height: "100%",
-    backgroundColor: "white",
-    borderRightWidth: 1,
-    borderColor: "#D4D4D4",
-    paddingVertical: 20,
-    alignItems: "center",
-    gap: 10,
-    position: "relative", 
+  menuList: {
+    gap: 6,
   },
-
-  topButtonsWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-
-  leftButton: {
-    backgroundColor: "#305685",
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderTopLeftRadius: 10,
-    borderBottomLeftRadius: 10,
-  },
-  rightButton: {
-    backgroundColor: "#305685",
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderTopRightRadius: 10,
-    borderBottomRightRadius: 10,
-  },
-  topButtonText: { color: "white", fontSize: 18, fontWeight: "bold" },
-
-  divider: {
-    width: 1,
-    backgroundColor: "#ccc",
-    height: 40,
-    position: "absolute",
-  },
-
-  calendarWrap: {
-    width: 300,
-    padding: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "white",
-    overflow: "hidden",
-  },
-
-  leaveHeader: {
-    flexDirection: "column",
-    alignItems: "center",
-    backgroundColor: "#305685",
-    paddingVertical: 12,
-    paddingHorizontal: 115,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
-  leaveHeaderText: { fontSize: 18, fontWeight: "bold", color: "white" },
-
-  leaveBody: {
-    backgroundColor: "white",
-    paddingVertical: 13,
-    paddingHorizontal: 10,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    flexDirection: "row",
-    gap: 23,
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    marginBottom: 60,
-  },
-  leaveCol: { alignItems: "center", gap: 5 },
-  leaveValue: { fontSize: 18 },
-  leaveVLine: {
-    width: 1,
-    backgroundColor: "rgba(213, 213, 213, 0.80)",
-    height: "100%",
-  },
-
-  menuBtn: {
-    width: "100%",
-    borderWidth: 2,
-    borderColor: "#305685",
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 13,
-    flexDirection: "row",
-    gap: 20,
+  menuSection: {
+    gap: 6,
     marginBottom: 10,
   },
-  menuBtnText: { color: "#305685", fontSize: 16, fontWeight: 600 },
+  menuSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+  },
+  menuSectionTitle: {
+    fontSize: 16,
+    color: "#9ca3af",
+  },
+  menuSectionArrow: {
+    fontSize: 16,
+    color: "#9ca3af",
+  },
+  menuItem: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    paddingVertical: 8,
+    paddingLeft: 8,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: "#000000ff",
+  },
+  overlayPanel: {
+    position: "absolute",
+    top: 0,
+    width: 240,
+    height: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRightWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 6, height: 0 },
+    zIndex: 999,
+  },
 
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,

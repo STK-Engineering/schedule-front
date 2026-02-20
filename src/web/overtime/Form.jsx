@@ -8,11 +8,15 @@ import {
   ScrollView,
   Alert,
   useWindowDimensions,
+  Image,
+  Platform,
+  Modal,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import PageLayout from "../../components/PageLayout";
 import api from "../../api/api";
 import Checkbox from "expo-checkbox";
+
 const STATUS_STYLE = {
   승인: { bg: "#E8EDFF", text: "#121D6D", dot: "#121D6D" },
   거절: { bg: "#FFE9E7", text: "#FF2116", dot: "#FF2116" },
@@ -31,6 +35,13 @@ const htmlInputStyle = {
   color: "#0F172A",
   outline: "none",
 };
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, idx) => {
+  const totalMinutes = idx * 30;
+  const hour = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const minute = String(totalMinutes % 60).padStart(2, "0");
+  return `${hour}:${minute}`;
+});
 
 const normalizeTimeValue = (value) => {
   if (!value) return "";
@@ -72,6 +83,23 @@ const isValidOvertimeInterval = (start, end) => {
   );
 };
 
+const isValidTimeStep = (value) => {
+  const normalized = normalizeTimeValue(value);
+  const match = normalized.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return false;
+  const minute = Number(match[2]);
+  return minute % 30 === 0;
+};
+
+const showStepAlert = () => {
+  const message = "시간은 30분 단위로 입력해주세요.";
+  if (typeof window !== "undefined" && typeof window.alert === "function") {
+    window.alert(message);
+    return;
+  }
+  Alert.alert("입력 오류", message);
+};
+
 const showIntervalAlert = () => {
   const message =
     "종료시간은 시작시간 기준 30분 단위로, 최소 30분~최대 12시간 내에서 입력해주세요.";
@@ -94,9 +122,16 @@ export default function Form() {
   const [requestDate, setRequestDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [imageDropdownOpen, setImageDropdownOpen] = useState(true);
+  const [attachments, setAttachments] = useState([]);
+  const [isDragOverImageZone, setIsDragOverImageZone] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewImageUri, setPreviewImageUri] = useState("");
   const [isChecked, setChecked] = useState(false);
   const [attemptedCheck, setAttemptedCheck] = useState(false);
   const endTimeAlertTimerRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const dragDepthRef = useRef(0);
 
   const hasVesselOrHull =
     vesselName.trim().length > 0 || hullNo.trim().length > 0;
@@ -126,8 +161,37 @@ export default function Form() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const getDataTransfer = (event) =>
+      event?.dataTransfer ?? event?.nativeEvent?.dataTransfer;
+
+    const hasFileType = (event) => {
+      const types = Array.from(getDataTransfer(event)?.types ?? []);
+      return types.includes("Files");
+    };
+
+    const preventBrowserFileDrop = (event) => {
+      if (!hasFileType(event)) return;
+      event.preventDefault();
+    };
+
+    window.addEventListener("dragover", preventBrowserFileDrop);
+    window.addEventListener("drop", preventBrowserFileDrop);
+
+    return () => {
+      window.removeEventListener("dragover", preventBrowserFileDrop);
+      window.removeEventListener("drop", preventBrowserFileDrop);
+    };
+  }, []);
+
   const handleEndTimeChange = (value) => {
     const nextEndTime = normalizeTimeValue(value);
+    if (nextEndTime && !isValidTimeStep(nextEndTime)) {
+      showStepAlert();
+      return;
+    }
     setEndTime(nextEndTime);
 
     if (endTimeAlertTimerRef.current) {
@@ -140,6 +204,117 @@ export default function Form() {
         showIntervalAlert();
       }
     }, 250);
+  };
+
+  const handleStartTimeChange = (value) => {
+    const nextStartTime = normalizeTimeValue(value);
+    if (nextStartTime && !isValidTimeStep(nextStartTime)) {
+      showStepAlert();
+      return;
+    }
+    setStartTime(nextStartTime);
+
+    if (endTimeAlertTimerRef.current) {
+      clearTimeout(endTimeAlertTimerRef.current);
+    }
+
+    endTimeAlertTimerRef.current = setTimeout(() => {
+      if (!nextStartTime || !endTime) return;
+      if (!isValidOvertimeInterval(nextStartTime, endTime)) {
+        showIntervalAlert();
+      }
+    }, 250);
+  };
+
+  const fileToDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const openImagePicker = () => {
+    if (imageInputRef.current) imageInputRef.current.click();
+  };
+
+  const appendImageFiles = async (incomingFiles) => {
+    const files = Array.from(incomingFiles ?? []).filter((file) =>
+      String(file?.type ?? "").startsWith("image/"),
+    );
+    if (!files.length) {
+      return;
+    }
+
+    try {
+      const file = files[0];
+      const uploaded = {
+        id: `${Date.now()}-${file.name}`,
+        name: file.name,
+        dataUrl: await fileToDataUrl(file),
+      };
+      setAttachments([uploaded]);
+    } catch (err) {
+      console.error("이미지 변환 실패", err);
+      Alert.alert("실패", "이미지 첨부에 실패했습니다.");
+    }
+  };
+
+  const handleImageSelect = async (e) => {
+    try {
+      await appendImageFiles(e?.target?.files);
+    } finally {
+      if (e?.target) e.target.value = "";
+    }
+  };
+
+  const handleImageDragOver = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsDragOverImageZone(true);
+  };
+
+  const handleImageDragEnter = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragOverImageZone(true);
+  };
+
+  const handleImageDragLeave = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragOverImageZone(false);
+    }
+  };
+
+  const handleImageDrop = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOverImageZone(false);
+    const droppedFiles =
+      e?.dataTransfer?.files ?? e?.nativeEvent?.dataTransfer?.files;
+    if (!droppedFiles?.length) return;
+    await appendImageFiles(droppedFiles);
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const openPreviewModal = (imageUri) => {
+    const uri = imageUri || attachments[0]?.dataUrl;
+    if (!uri) return;
+    setPreviewImageUri(uri);
+    setPreviewModalOpen(true);
+  };
+
+  const closePreviewModal = () => {
+    setPreviewModalOpen(false);
+    setPreviewImageUri("");
   };
 
   const sendDateForm = async () => {
@@ -164,6 +339,14 @@ export default function Form() {
       requestDate,
       startTime: withSeconds(normalizeTimeValue(startTime)),
       endTime: withSeconds(normalizeTimeValue(endTime)),
+      ...(attachments.length > 0
+        ? {
+            images: attachments.map((item) => ({
+              name: item.name,
+              dataUrl: item.dataUrl,
+            })),
+          }
+        : {}),
     };
 
     try {
@@ -196,7 +379,7 @@ export default function Form() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>신청 정보</Text>
             <Text style={styles.sectionSub}>
-              필수 항목을 빠짐없이 입력해 주세요.
+              * 표시는 필수 항목입니다.
             </Text>
           </View>
           <View style={styles.sectionDivider} />
@@ -205,7 +388,7 @@ export default function Form() {
             <Text style={styles.fieldGroupTitle}>작업 정보</Text>
             <View style={styles.fieldRow}>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>작업 번호(Job Number)</Text>
+                <Text style={styles.fieldLabel}>* 작업 번호(Job Number)</Text>
                 <TextInput
                   placeholder="예: STKP-26000203"
                   value={jobNumber}
@@ -238,7 +421,7 @@ export default function Form() {
             <Text style={styles.fieldGroupTitle}>작업 일정</Text>
             <View style={styles.fieldRow}>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>요청일자</Text>
+                <Text style={styles.fieldLabel}>* 요청일자</Text>
                 <input
                   type="date"
                   style={htmlInputStyle}
@@ -247,31 +430,173 @@ export default function Form() {
                 />
               </View>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>시작시간</Text>
+                <Text style={styles.fieldLabel}>* 시작시간</Text>
                 <input
                   type="time"
                   style={htmlInputStyle}
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
+                  onChange={(e) => handleStartTimeChange(e.target.value)}
+                  step={1800}
+                  list="overtime-time-options"
                 />
               </View>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>종료시간</Text>
+                <Text style={styles.fieldLabel}>* 종료시간</Text>
                 <input
                   type="time"
                   style={htmlInputStyle}
                   value={endTime}
                   onChange={(e) => handleEndTimeChange(e.target.value)}
+                  step={1800}
+                  list="overtime-time-options"
                 />
               </View>
             </View>
+            <datalist id="overtime-time-options">
+              {TIME_OPTIONS.map((value) => (
+                <option key={value} value={value} />
+              ))}
+            </datalist>
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>작업 내용</Text>
+            <View style={styles.imageSectionHeader}>
+              <Text style={styles.fieldGroupTitle}>이미지 첨부</Text>
+              <TouchableOpacity
+                style={styles.imageDropdownButton}
+                onPress={() => setImageDropdownOpen((prev) => !prev)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.imageDropdownButtonText}>
+                  {imageDropdownOpen ? "접기 ▲" : "펼치기 ▼"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {imageDropdownOpen && (
+              <>
+              {Platform.OS === "web" ? (
+                <div
+                  onDragEnter={handleImageDragEnter}
+                  onDragOver={handleImageDragOver}
+                  onDragLeave={handleImageDragLeave}
+                  onDrop={handleImageDrop}
+                  style={{
+                    ...StyleSheet.flatten([
+                      styles.imageAttachPanel,
+                      isDragOverImageZone && styles.imageAttachPanelActive,
+                    ]),
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                  }}
+                >
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    style={{ display: "none" }}
+                  />
+                  <TouchableOpacity
+                    style={styles.imageUploadButton}
+                    onPress={openImagePicker}
+                  >
+                    <Text style={styles.imageUploadButtonText}>이미지 선택</Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.imageHintText}>
+                    드래그하거나 버튼으로 선택
+                  </Text>
+
+                  {attachments.length > 0 && (
+                    <View style={styles.imageList}>
+                      {attachments.map((item) => (
+                        <View key={item.id} style={styles.imageCard}>
+                          <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => openPreviewModal(item.dataUrl)}
+                          >
+                            <Image
+                              source={{ uri: item.dataUrl }}
+                              style={styles.imageThumb}
+                            />
+                          </TouchableOpacity>
+                          <Text style={styles.imageName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.imageRemoveButton}
+                            onPress={() => removeAttachment(item.id)}
+                          >
+                            <Text style={styles.imageRemoveButtonText}>삭제</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </div>
+              ) : (
+              <View
+                style={[
+                  styles.imageAttachPanel,
+                  isDragOverImageZone && styles.imageAttachPanelActive,
+                ]}
+              >
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  style={{ display: "none" }}
+                />
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={openImagePicker}
+                >
+                  <Text style={styles.imageUploadButtonText}>이미지 선택</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.imageHintText}>
+                  드래그하거나 버튼으로 선택
+                </Text>
+
+                {attachments.length > 0 && (
+                  <View style={styles.imageList}>
+                    {attachments.map((item) => (
+                      <View key={item.id} style={styles.imageCard}>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => openPreviewModal(item.dataUrl)}
+                        >
+                          <Image
+                            source={{ uri: item.dataUrl }}
+                            style={styles.imageThumb}
+                          />
+                        </TouchableOpacity>
+                        <Text style={styles.imageName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.imageRemoveButton}
+                          onPress={() => removeAttachment(item.id)}
+                        >
+                          <Text style={styles.imageRemoveButtonText}>삭제</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+              )}
+              </>
+            )}
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldGroupTitle}>* 작업 내용</Text>
             <View style={styles.fieldRow}>
               <View style={[styles.fieldItem, styles.fieldItemFull]}>
-                <Text style={styles.fieldLabel}>내용</Text>
                 <TextInput
                   placeholder="작업 내용을 입력하세요"
                   value={jobDescription}
@@ -332,6 +657,26 @@ export default function Form() {
               value={jobDescription || "-"}
               multiline
             />
+            <View style={styles.tableRow}>
+              <View style={styles.tableLabelCell}>
+                <Text style={styles.tableLabel}>이미지</Text>
+              </View>
+              <View style={styles.tableValueCell}>
+                {attachments.length > 0 ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => openPreviewModal(attachments[0].dataUrl)}
+                  >
+                    <Image
+                      source={{ uri: attachments[0].dataUrl }}
+                      style={styles.previewImage}
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.tableValue}>첨부 없음</Text>
+                )}
+              </View>
+            </View>
           </View>
         </View>
 
@@ -402,6 +747,39 @@ export default function Form() {
           <Text style={styles.backButtonText}>뒤로</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={previewModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closePreviewModal}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={closePreviewModal}
+          style={styles.previewModalOverlay}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={styles.previewModalBox}
+          >
+            {!!previewImageUri && (
+              <Image
+                source={{ uri: previewImageUri }}
+                style={styles.previewModalImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity
+              style={styles.previewModalCloseButton}
+              onPress={closePreviewModal}
+            >
+              <Text style={styles.previewModalCloseText}>닫기</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </PageLayout>
   );
 }
@@ -503,6 +881,100 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textTransform: "uppercase",
     letterSpacing: 0.6,
+  },
+  imageSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+    gap: 10,
+  },
+  imageDropdownButton: {
+    height: 30,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 10,
+    justifyContent: "center",
+  },
+  imageDropdownButtonText: {
+    fontSize: 12,
+    color: "#334155",
+    fontWeight: "600",
+  },
+  imageAttachPanel: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    gap: 10,
+    alignItems: "center",
+  },
+  imageAttachPanelActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  imageUploadButton: {
+    alignSelf: "center",
+    width: 80,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    justifyContent: "center",
+  },
+  imageUploadButtonText: {
+    color: "#8f8f8fff",
+    fontSize: 12,
+    fontWeight: "400",
+    textAlign: "center",
+  },
+  imageHintText: {
+    color: "#64748B",
+    fontSize: 12,
+    textAlign: "center",
+    alignSelf: "center",
+    maxWidth: 240,
+  },
+  imageList: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "center",
+  },
+  imageCard: {
+    width: 170,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    padding: 8,
+    gap: 8,
+  },
+  imageThumb: {
+    width: "100%",
+    height: 90,
+    borderRadius: 6,
+    backgroundColor: "#E5E7EB",
+  },
+  imageName: {
+    fontSize: 12,
+    color: "#334155",
+  },
+  imageRemoveButton: {
+    alignSelf: "flex-end",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#FEE2E2",
+  },
+  imageRemoveButtonText: {
+    fontSize: 11,
+    color: "#B91C1C",
+    fontWeight: "600",
   },
   fieldRow: {
     flexDirection: "row",
@@ -650,4 +1122,47 @@ const styles = StyleSheet.create({
   tableLabel: { fontSize: 12, fontWeight: "600", color: "#475569" },
   tableValue: { fontSize: 14, color: "#0F172A", lineHeight: 20 },
   tableValueMultiline: { lineHeight: 20 },
+  previewImage: {
+    width: 260,
+    height: 160,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  previewModalBox: {
+    width: "100%",
+    maxWidth: 900,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  previewModalImage: {
+    width: "100%",
+    height: 560,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
+  },
+  previewModalCloseButton: {
+    alignSelf: "flex-end",
+    marginTop: 10,
+    backgroundColor: "#121D6D",
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  previewModalCloseText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
 });

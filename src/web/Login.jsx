@@ -114,7 +114,7 @@ export default function Login() {
         >
           <TouchableOpacity onPress={() => navigation.navigate("Find")}>
             <Text style={{ color: "#121D6D", fontSize: 16 }}>
-              비밀번호 찾기
+              비밀번호 재설정
             </Text>
           </TouchableOpacity>
           <View

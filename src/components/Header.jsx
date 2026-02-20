@@ -146,7 +146,7 @@ export default function Header({ onToggleSidebar }) {
 
   const goSchedule = () => {
     navigation.navigate("Schedule");
-  }
+  };
 
   const goLogin = () => {
     navigateRoot("Login");
@@ -154,7 +154,9 @@ export default function Header({ onToggleSidebar }) {
   };
 
   const normalizeAuthority = (value) => {
-    const raw = String(value ?? "").trim().toLowerCase();
+    const raw = String(value ?? "")
+      .trim()
+      .toLowerCase();
     if (raw === "관리자") return "admin";
     if (raw === "결재자") return "manager";
     if (raw === "일반") return "general";
@@ -212,6 +214,19 @@ export default function Header({ onToggleSidebar }) {
       ].filter((item) => item.visible),
     },
     {
+      id: "scheduling",
+      title: "일정 관리",
+      visible: canSeeAdmin,
+      items: [
+        { label: "일정 등록", route: "SchedulingForm", visible: canSeeAdmin },
+        {
+          label: "일정 관리",
+          route: "SchedulingList",
+          visible: canSeeAdmin,
+        },
+      ].filter((item) => item.visible),
+    },
+    {
       id: "admin",
       title: "어드민",
       visible: canSeeAdmin,
@@ -260,7 +275,7 @@ export default function Header({ onToggleSidebar }) {
 
   const userMenuItems = [
     { label: "홈", route: "Home" },
-    { label: "비밀번호 재설정", route: "PasswordChange" },
+    { label: "비밀번호 변경", route: "PasswordChange" },
     { label: "로그아웃", action: handleLogout },
   ];
 
@@ -469,7 +484,7 @@ export default function Header({ onToggleSidebar }) {
                   color: "black",
                 }}
               >
-                {`${userName || ""}님`} 
+                {`${userName || ""}님`}
               </Text>
             </TouchableOpacity>
             {openUserMenu ? (

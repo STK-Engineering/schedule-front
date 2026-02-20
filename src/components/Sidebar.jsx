@@ -38,7 +38,7 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
                 if (!item) return [];
                 if (typeof item === "string") return [item];
                 return [item.authorityName, item.name, item.authority].filter(
-                  Boolean
+                  Boolean,
                 );
               })
               .map((v) => String(v).toLowerCase())
@@ -87,9 +87,7 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
   }, [collapsed, panelAnim]);
 
   const hasAuthority = (target) =>
-    authorities.some(
-      (auth) => auth === target || auth === `role_${target}`
-    );
+    authorities.some((auth) => auth === target || auth === `role_${target}`);
   const canSeeManager = hasAuthority("manager");
   const canSeeAdmin = hasAuthority("admin");
 
@@ -100,8 +98,16 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
       items: [
         { label: "휴가 신청", route: "LeaveForm", visible: true },
         { label: "내 휴가 신청 내역", route: "LeaveStatus", visible: true },
-        { label: "휴가 결재 요청", route: "LeaveRequest", visible: canSeeManager },
-        { label: "승인된 휴가", route: "LeaveApplication", visible: canSeeAdmin },
+        {
+          label: "휴가 결재 요청",
+          route: "LeaveRequest",
+          visible: canSeeManager,
+        },
+        {
+          label: "승인된 휴가",
+          route: "LeaveApplication",
+          visible: canSeeAdmin,
+        },
       ].filter((item) => item.visible),
     },
     {
@@ -109,19 +115,36 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
       title: "연장 근로",
       items: [
         { label: "연장 근로 신청", route: "OverTimeForm", visible: true },
-        { label: "내 연장 근로 신청 내역", route: "OverTimeStatus", visible: true },
+        {
+          label: "내 연장 근로 신청 내역",
+          route: "OverTimeStatus",
+          visible: true,
+        },
         {
           label: "연장 근로 결재 요청",
           route: "OverTimeRequest",
           visible: canSeeManager,
         },
         {
-        label: "승인된 연장 근로",
-        route: "OverTimeApplication",
-        visible: canSeeAdmin,
-      },
-    ].filter((item) => item.visible),
-  },
+          label: "승인된 연장 근로",
+          route: "OverTimeApplication",
+          visible: canSeeAdmin,
+        },
+      ].filter((item) => item.visible),
+    },
+    {
+      id: "scheduling",
+      title: "일정 관리",
+      visible: canSeeAdmin,
+      items: [
+        { label: "일정 등록", route: "SchedulingForm", visible: canSeeAdmin },
+        {
+          label: "일정 관리",
+          route: "SchedulingList",
+          visible: canSeeAdmin,
+        },
+      ].filter((item) => item.visible),
+    },
     {
       id: "admin",
       title: "어드민",
@@ -129,7 +152,7 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
       items: [
         {
           label: "사용자 관리",
-          route: "Setting"
+          route: "Setting",
         },
         {
           label: "연차 현황 관리",

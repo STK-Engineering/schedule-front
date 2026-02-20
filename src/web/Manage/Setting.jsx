@@ -15,15 +15,21 @@ import Checkbox from "expo-checkbox";
 import api from "../../api/api";
 
 const columns = [
-  { key: "name", title: "이름", width: 100, sortable: true },
+  { key: "employeeId", title: "사번", width: 120, sortable: true },
+  { key: "name", title: "이름", width: 90, sortable: true },
   { key: "department", title: "부서", width: 155, sortable: true },
-  { key: "engineeringPart", title: "ENGINEERING 구분", width: 200, sortable: true },
+  {
+    key: "engineeringPart",
+    title: "ENGINEERING 구분",
+    width: 160,
+    sortable: true,
+  },
   { key: "position", title: "직급", width: 90, sortable: true },
   { key: "date", title: "입사일", width: 140, sortable: true },
   { key: "location", title: "근무지", width: 83, sortable: true },
   { key: "mail", title: "메일", width: 203, sortable: true },
-  { key: "role", title: "권한", width: 120, sortable: true },
-  { key: "status", title: "상태", width: 250, sortable: true },
+  { key: "role", title: "권한", width: 150, sortable: true },
+  { key: "status", title: "상태", width: 160, sortable: true },
   { key: "actions", title: "", width: 56, sortable: false },
 ];
 
@@ -32,6 +38,19 @@ const ROLE_MAP = {
   GENERAL: "일반",
   ADMIN: "관리자",
   MANAGER: "결재자",
+};
+const ROLE_TO_API_MAP = {
+  일반: "GENERAL",
+  관리자: "ADMIN",
+  결재자: "MANAGER",
+};
+const SCHEDULE_ROLE_MAP = {
+  SCHEDULE_GENERAL: "일반",
+  SCHEDULE_ADMIN: "관리자",
+};
+const SCHEDULE_ROLE_TO_API_MAP = {
+  일반: "SCHEDULE_GENERAL",
+  관리자: "SCHEDULE_ADMIN",
 };
 const ENGINEERING_DEPT_ID = 3;
 const ENGINEERING_SUB_DEPTS = [
@@ -50,7 +69,7 @@ const DEFAULT_POSITIONS = [
   "부장",
   "이사",
   "전무",
-  "대표"
+  "대표",
 ];
 
 const formatYYYYMMDD = (text) => {
@@ -62,6 +81,11 @@ const formatYYYYMMDD = (text) => {
   if (digits.length <= 4) return y;
   if (digits.length <= 6) return `${y}-${m}`;
   return `${y}-${m}-${d}`;
+};
+
+const toIntOrNull = (value) => {
+  const num = Number.parseInt(String(value ?? "").trim(), 10);
+  return Number.isNaN(num) ? null : num;
 };
 
 function SelectField({
@@ -136,6 +160,7 @@ function normalizeRoles(value) {
         return [v.name, v.role, v.authorityName].filter(Boolean);
       })
       .map((v) => String(v).trim())
+      .filter((v) => !SCHEDULE_ROLE_MAP[String(v).toUpperCase()])
       .map((v) => ROLE_MAP[v.toUpperCase()] ?? v);
     return Array.from(new Set([BASE_ROLE, ...cleaned]));
   }
@@ -144,10 +169,33 @@ function normalizeRoles(value) {
       .split(",")
       .map((v) => v.trim())
       .filter(Boolean)
+      .filter((v) => !SCHEDULE_ROLE_MAP[String(v).toUpperCase()])
       .map((v) => ROLE_MAP[v.toUpperCase()] ?? v);
     return Array.from(new Set([BASE_ROLE, ...parts]));
   }
   return [BASE_ROLE];
+}
+
+function normalizeSchedulePermissions(value) {
+  if (!value) return [];
+  const source = Array.isArray(value)
+    ? value
+    : String(value)
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+  const mapped = source
+    .flatMap((v) => {
+      if (!v) return [];
+      if (typeof v === "string") return [v];
+      return [v.name, v.role, v.authorityName].filter(Boolean);
+    })
+    .map((v) => String(v).trim())
+    .map((v) => SCHEDULE_ROLE_MAP[v.toUpperCase()] ?? (v === "일반" || v === "관리자" ? v : null))
+    .filter(Boolean);
+
+  return Array.from(new Set(mapped));
 }
 
 function ensureGeneral(values) {
@@ -176,6 +224,7 @@ export default function Setting() {
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const [actionMenuItem, setActionMenuItem] = useState(null);
 
+  const [employeeId, setEmployeeId] = useState("");
   const [name, setName] = useState("");
   const [department, setDepartment] = useState(null);
   const [position, setPosition] = useState("");
@@ -184,6 +233,7 @@ export default function Setting() {
   const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
   const [roles, setRoles] = useState([BASE_ROLE]);
+  const [schedulePermissions, setSchedulePermissions] = useState([]);
   const [accountStatus, setAccountStatus] = useState("ACTIVE");
   const [originalStatus, setOriginalStatus] = useState("ACTIVE");
   const [subDepartment, setSubDepartment] = useState("");
@@ -232,6 +282,13 @@ export default function Setting() {
     ],
     [],
   );
+  const SCHEDULE_PERMISSION_OPTIONS = useMemo(
+    () => [
+      { label: "일반", value: "일반" },
+      { label: "관리자", value: "관리자" },
+    ],
+    [],
+  );
 
   const LOCATIONS = useMemo(
     () => [
@@ -242,6 +299,7 @@ export default function Setting() {
   );
 
   const resetForm = () => {
+    setEmployeeId("");
     setName("");
     setDepartment(null);
     setPosition("");
@@ -249,6 +307,7 @@ export default function Setting() {
     setBirthDate("");
     setEmail("");
     setRoles([BASE_ROLE]);
+    setSchedulePermissions([]);
     setLocation("");
     setAccountStatus("ACTIVE");
     setOriginalStatus("ACTIVE");
@@ -297,8 +356,10 @@ export default function Setting() {
     const normalizedRoles = ensureGeneral(roles);
     const mustHaveSubDepartment =
       department === ENGINEERING_DEPT_ID && !subDepartment;
+    const normalizedEmployeeId = toIntOrNull(employeeId);
 
     if (
+      normalizedEmployeeId === null ||
       !name ||
       (mustHaveEmail && !email) ||
       !department ||
@@ -316,13 +377,22 @@ export default function Setting() {
 
   const buildPayload = () => {
     const normalizedRoles = ensureGeneral(roles);
+    const baseApiRoles = normalizedRoles
+      .map((v) => ROLE_TO_API_MAP[v] ?? String(v).trim().toUpperCase())
+      .filter(Boolean);
+    const scheduleApiRoles = schedulePermissions
+      .map((v) => SCHEDULE_ROLE_TO_API_MAP[v] ?? null)
+      .filter(Boolean);
+    const apiRoles = Array.from(new Set([...baseApiRoles, ...scheduleApiRoles]));
+    const normalizedEmployeeId = toIntOrNull(employeeId);
     const payload = {
+      employeeId: normalizedEmployeeId,
       name,
       level: position,
       departmentId: department,
       hireDate,
       location,
-      roles: normalizedRoles,
+      roles: apiRoles,
     };
     if (department === ENGINEERING_DEPT_ID && subDepartment) {
       payload.engineeringPartId = subDepartment;
@@ -332,7 +402,6 @@ export default function Setting() {
       payload.email = email;
     }
     if (mode === "edit") {
-      payload.employeeId = editingEmployeeId ?? editingId;
       payload.accountStatus = accountStatus;
     }
 
@@ -364,6 +433,7 @@ export default function Setting() {
             return match ? match.value : "";
           })(),
           roles: normalizeRoles(e.roles ?? e.role),
+          schedulePermissions: normalizeSchedulePermissions(e.roles ?? e.role),
           id: e.id,
           employeeId: e.employeeId ?? e.employee_id ?? e.empId ?? e.emp_id,
           name: e.name,
@@ -516,6 +586,7 @@ export default function Setting() {
     setEditingEmployeeId(item.employeeId ?? null);
     setEditingUserId(item.userId ?? null);
 
+    setEmployeeId(item.employeeId ?? "");
     setName(item.name ?? "");
     setPosition(item.position ?? "");
     setHireDate(item.date ?? "");
@@ -523,6 +594,11 @@ export default function Setting() {
     setEmail(item.mail ?? "");
     setDepartment(item.departmentId ?? item.department?.id ?? null);
     setRoles(ensureGeneral(item.roles ?? item.role));
+    setSchedulePermissions(
+      normalizeSchedulePermissions(
+        item.schedulePermissions ?? item.roles ?? item.role,
+      ),
+    );
     setSubDepartment(item.subDepartment ?? "");
     setAccountStatus(item.status ?? "ACTIVE");
     setOriginalStatus(item.status ?? "ACTIVE");
@@ -801,6 +877,15 @@ export default function Setting() {
 
             <TextInput
               style={styles.input}
+              value={employeeId}
+              onChangeText={setEmployeeId}
+              placeholder="사번"
+              onFocus={() => setOpenDropdown(null)}
+              placeholderTextColor="#999"
+            />
+
+            <TextInput
+              style={styles.input}
               value={name}
               onChangeText={setName}
               placeholder="이름"
@@ -836,8 +921,8 @@ export default function Setting() {
                 onToggle={() =>
                   setOpenDropdown((prev) =>
                     prev === "subDepartment" ? null : "subDepartment",
-                )
-              }
+                  )
+                }
                 options={ENGINEERING_SUB_DEPTS}
                 onSelect={(v) => {
                   setSubDepartment(v);
@@ -888,7 +973,7 @@ export default function Setting() {
             />
 
             <View style={styles.roleGroup}>
-              <Text style={styles.filterLabel}>권한</Text>
+              <Text style={styles.filterLabel}>휴가/연장근로 권한</Text>
               <View style={styles.checkboxRow}>
                 {ROLES.map((opt) => {
                   const checked = roles.includes(opt.value);
@@ -925,6 +1010,45 @@ export default function Setting() {
                         }}
                         color="#121D6D"
                         disabled={isGeneral}
+                      />
+                      <Text style={styles.checkboxText}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.roleGroup}>
+              <Text style={styles.filterLabel}>일정 권한</Text>
+              <View style={styles.checkboxRow}>
+                {SCHEDULE_PERMISSION_OPTIONS.map((opt) => {
+                  const checked = schedulePermissions.includes(opt.value);
+                  return (
+                    <TouchableOpacity
+                      key={`schedule-${opt.value}`}
+                      style={[
+                        styles.checkboxItem,
+                        checked && styles.checkboxItemActive,
+                      ]}
+                      onPress={() => {
+                        setSchedulePermissions((prev) =>
+                          prev.includes(opt.value)
+                            ? prev.filter((v) => v !== opt.value)
+                            : [...prev, opt.value],
+                        );
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Checkbox
+                        value={checked}
+                        onValueChange={() => {
+                          setSchedulePermissions((prev) =>
+                            prev.includes(opt.value)
+                              ? prev.filter((v) => v !== opt.value)
+                              : [...prev, opt.value],
+                          );
+                        }}
+                        color="#121D6D"
                       />
                       <Text style={styles.checkboxText}>{opt.label}</Text>
                     </TouchableOpacity>

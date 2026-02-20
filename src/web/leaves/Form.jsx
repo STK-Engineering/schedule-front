@@ -442,13 +442,13 @@ export default function Form() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>신청 정보</Text>
             <Text style={styles.sectionSub}>
-              필수 항목을 빠짐없이 입력해 주세요.
+              * 표시는 필수 항목입니다.
             </Text>
           </View>
           <View style={styles.sectionDivider} />
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>휴가 유형</Text>
+            <Text style={styles.fieldGroupTitle}>* 휴가 유형</Text>
             <View style={styles.fieldRow}>
               <View style={[styles.fieldItem, styles.fieldItemFull]}>
                 <View style={styles.leaveTypeRow}>
@@ -487,7 +487,7 @@ export default function Form() {
             <View style={styles.fieldRow}>
               {isHalfDay || isHealthCheck ? (
                 <View style={styles.fieldItem}>
-                  <Text style={styles.fieldLabel}>요청일자</Text>
+                  <Text style={styles.fieldLabel}>* 요청일자</Text>
                   <input
                     type="date"
                     style={htmlInputStyle}
@@ -501,7 +501,7 @@ export default function Form() {
               ) : (
                 <>
                   <View style={styles.fieldItem}>
-                    <Text style={styles.fieldLabel}>시작일</Text>
+                    <Text style={styles.fieldLabel}>* 시작일</Text>
                     <input
                       type="date"
                       style={htmlInputStyle}
@@ -510,7 +510,7 @@ export default function Form() {
                     />
                   </View>
                   <View style={styles.fieldItem}>
-                    <Text style={styles.fieldLabel}>종료일</Text>
+                    <Text style={styles.fieldLabel}>* 종료일</Text>
                     <input
                       type="date"
                       style={htmlInputStyle}
@@ -525,7 +525,7 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>사유</Text>
+            <Text style={styles.fieldGroupTitle}>* 사유</Text>
             {leaveType === "경조사" || leaveType === "기타" ? (
               <View style={styles.reasonOptionsRow}>
                 {(leaveType === "경조사" ? condolenceReasons : etcReasons).map(

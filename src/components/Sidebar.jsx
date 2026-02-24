@@ -16,8 +16,8 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
   const [authorities, setAuthorities] = useState([]);
   const [isLoggedOut, setIsLoggedOut] = useState(false);
   const [openSections, setOpenSections] = useState({
-    mypage: true,
-    leave: true,
+    mypage: false,
+    leave: false,
   });
   const panelAnim = useRef(new Animated.Value(0)).current;
 
@@ -90,6 +90,10 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
     authorities.some((auth) => auth === target || auth === `role_${target}`);
   const canSeeManager = hasAuthority("manager");
   const canSeeAdmin = hasAuthority("admin");
+  const canSeeSchedule =
+    hasAuthority("schdule_admin") ||
+    hasAuthority("schedule_admin") ||
+    hasAuthority("schedule_general");
 
   const menuSections = [
     {
@@ -135,13 +139,13 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
     {
       id: "scheduling",
       title: "일정 관리",
-      visible: canSeeAdmin,
+      visible: canSeeSchedule,
       items: [
-        { label: "일정 등록", route: "SchedulingForm", visible: canSeeAdmin },
+        { label: "일정 등록", route: "SchedulingForm", visible: canSeeSchedule },
         {
           label: "일정 관리",
           route: "SchedulingList",
-          visible: canSeeAdmin,
+          visible: canSeeSchedule,
         },
       ].filter((item) => item.visible),
     },

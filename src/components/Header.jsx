@@ -171,6 +171,10 @@ export default function Header({ onToggleSidebar }) {
   };
   const canSeeManager = hasAuthority("manager");
   const canSeeAdmin = hasAuthority("admin");
+  const canSeeSchedule =
+    hasAuthority("schdule_admin") ||
+    hasAuthority("schedule_admin") ||
+    hasAuthority("schedule_general");
 
   const menuSections = [
     {
@@ -216,13 +220,13 @@ export default function Header({ onToggleSidebar }) {
     {
       id: "scheduling",
       title: "일정 관리",
-      visible: canSeeAdmin,
+      visible: canSeeSchedule,
       items: [
-        { label: "일정 등록", route: "SchedulingForm", visible: canSeeAdmin },
+        { label: "일정 등록", route: "SchedulingForm", visible: canSeeSchedule },
         {
           label: "일정 관리",
           route: "SchedulingList",
-          visible: canSeeAdmin,
+          visible: canSeeSchedule,
         },
       ].filter((item) => item.visible),
     },
@@ -247,9 +251,11 @@ export default function Header({ onToggleSidebar }) {
     },
   ].filter((section) => section.visible !== false);
 
-  const handleTitlePress = (id) => {
-    setOpenMenu(id);
-    navigation.navigate("Form");
+  const handleTitlePress = (section) => {
+    const target = section?.items?.find((item) => item?.route);
+    if (!target?.route) return;
+    setOpenMenu(null);
+    navigation.navigate(target.route);
   };
 
   const cancelClose = () => {
@@ -375,7 +381,7 @@ export default function Header({ onToggleSidebar }) {
               onMouseLeave={scheduleClose}
             >
               <TouchableOpacity
-                onPress={() => handleTitlePress(section.id)}
+                onPress={() => handleTitlePress(section)}
                 style={{
                   height: HEADER_HEIGHT,
                   width: 160,

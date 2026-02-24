@@ -177,39 +177,112 @@ function isDateInRange(dateKey, start, end) {
   return dateKey >= startKey && dateKey <= endKey;
 }
 
+function isNextDateKey(prevDateKey, nextDateKey) {
+  const prev = toDateOnly(prevDateKey);
+  const nextOfPrev = new Date(prev);
+  nextOfPrev.setDate(prev.getDate() + 1);
+  return toDateKey(nextOfPrev) === nextDateKey;
+}
+
+function buildHolidayEvent(name, startDateKey, endDateKey, dates) {
+  return {
+    title: name || "공휴일",
+    start: toDate(startDateKey, 0, 0),
+    end: toDate(endDateKey, 23, 59),
+    raw: {
+      leaveType: "공휴일",
+      isHoliday: true,
+      name: name || "공휴일",
+      dateName: name || "공휴일",
+      startDate: startDateKey,
+      endDate: endDateKey,
+      dates,
+    },
+  };
+}
+
+function mergeConsecutiveHolidayEvents(holidayItems) {
+  const byName = new Map();
+  const dedupe = new Set();
+
+  for (const holiday of holidayItems) {
+    const date = normalizeHolidayDate(holiday?.date);
+    if (!date) continue;
+    const name = String(holiday?.name || "공휴일");
+    const key = `${name}|${date}`;
+    if (dedupe.has(key)) continue;
+    dedupe.add(key);
+
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(date);
+  }
+
+  const merged = [];
+  for (const [name, dates] of byName.entries()) {
+    const sortedDates = Array.from(new Set(dates)).sort();
+    if (!sortedDates.length) continue;
+
+    let rangeStart = sortedDates[0];
+    let rangeEnd = sortedDates[0];
+    let rangeDates = [sortedDates[0]];
+
+    for (let i = 1; i < sortedDates.length; i += 1) {
+      const current = sortedDates[i];
+      if (isNextDateKey(rangeEnd, current)) {
+        rangeEnd = current;
+        rangeDates.push(current);
+      } else {
+        merged.push(buildHolidayEvent(name, rangeStart, rangeEnd, rangeDates));
+        rangeStart = current;
+        rangeEnd = current;
+        rangeDates = [current];
+      }
+    }
+
+    merged.push(buildHolidayEvent(name, rangeStart, rangeEnd, rangeDates));
+  }
+
+  return merged.sort((a, b) => a.start - b.start);
+}
+
+const LEAVE_UNIFIED_STYLE = {
+  bg: "#FCE7F3",
+  border: "#F9A8D4",
+  text: "#9D174D",
+};
+
+const LEAVE_TYPES_UNIFIED = new Set([
+  "연차",
+  "오전반차",
+  "오후반차",
+  "본인의 결혼",
+  "배우자 출산",
+  "본인•배우자의 부모 또는 배우자의 사망",
+  "본인•배우자의 조부모 또는 외조부모의 사망",
+  "자녀 또는 자녀의 배우자 사망",
+  "본인•배우자의 형제•자매 사망",
+  "건강검진",
+  "예비군",
+  "특별보상휴가",
+  "무급",
+  "출산",
+]);
+
 const LEAVE_TYPE_STYLES = {
-  연차: { bg: "#DCEFE6", border: "#9CCFB6", text: "#1F5A45" },
-  오전반차: { bg: "#DDE9FB", border: "#9BBEE6", text: "#1D4C7A" },
-  오후반차: { bg: "#E5E3FB", border: "#B7B7E6", text: "#3B3E7E" },
-  "본인의 결혼": { bg: "#EEE7E1", border: "#D2C7BC", text: "#5B4E44" },
-  "배우자 출산": { bg: "#EEE7E1", border: "#D2C7BC", text: "#5B4E44" },
-  "본인•배우자의 부모 또는 배우자의 사망": {
-    bg: "#EEE7E1",
-    border: "#D2C7BC",
-    text: "#5B4E44",
-  },
-  "본인•배우자의 조부모 또는 외조부모의 사망": {
-    bg: "#EEE7E1",
-    border: "#D2C7BC",
-    text: "#5B4E44",
-  },
-  "자녀 또는 자녀의 배우자 사망": { bg: "#F4E2E2", border: "#E0B1B1", text: "#7A2D2D" },
-  "본인•배우자의 형제•자매 사망": { bg: "#F4E2E2", border: "#E0B1B1", text: "#7A2D2D" },
-  건강검진: { bg: "#EAEFF6", border: "#C1CAD7", text: "#3A4A5E" },
-  예비군: { bg: "#EAEFF6", border: "#C1CAD7", text: "#3A4A5E" },
-  특별보상휴가: { bg: "#EAEFF6", border: "#C1CAD7", text: "#3A4A5E" },
-  무급: { bg: "#EAEFF6", border: "#C1CAD7", text: "#3A4A5E" },
-  출산: { bg: "#F7E0EC", border: "#E2B4CB", text: "#7A3B58" },
-  연장근로: { bg: "#D8F1EF", border: "#9DCFCB", text: "#0F5D58" },
+  연장근로: { bg: "#E0F2FE", border: "#93C5FD", text: "#1D4ED8" },
   공휴일: { bg: "#F4F7FB", border: "#E8B8B8", text: "#B42323" },
 };
 
-const getLeaveTypeStyle = (leaveType) =>
-  LEAVE_TYPE_STYLES[leaveType] ?? {
-    bg: "#E5E7EB",
-    border: "#9CA3AF",
-    text: "#334155",
-  };
+const getLeaveTypeStyle = (leaveType) => {
+  if (LEAVE_TYPES_UNIFIED.has(leaveType)) return LEAVE_UNIFIED_STYLE;
+  return (
+    LEAVE_TYPE_STYLES[leaveType] ?? {
+      bg: "#E5E7EB",
+      border: "#9CA3AF",
+      text: "#334155",
+    }
+  );
+};
 
 const addDays = (date, days) => {
   const d = new Date(date);
@@ -370,8 +443,23 @@ export default function Schedule() {
         (item) => item.approvalStatusDisplay === "승인"
       );
 
-      const overtimeRes = await api.get("/overtime");
-      overtimeList = Array.isArray(overtimeRes.data) ? overtimeRes.data : [];
+      if (onlyMine) {
+        const overtimeRes = await api.get("/overtime/me");
+
+        if (Array.isArray(overtimeRes.data)) {
+          overtimeList = overtimeRes.data;
+        } else {
+          overtimeList = [
+            ...(overtimeRes.data?.["요청 대기 건"] ?? []),
+            ...(overtimeRes.data?.["요청 처리 건"] ?? []),
+          ];
+        }
+
+        overtimeList = overtimeList.map((x) => ({ ...x, isMine: true }));
+      } else {
+        const overtimeRes = await api.get("/overtime");
+        overtimeList = Array.isArray(overtimeRes.data) ? overtimeRes.data : [];
+      }
       const approvedOvertimeOnly = overtimeList.filter(
         (item) => item.approvalStatusDisplay === "승인"
       );
@@ -476,18 +564,7 @@ export default function Schedule() {
     const overtimeEvents = filteredOvertime
       .map(overtimeToEvent)
       .filter(Boolean);
-    const holidayEvents = holidays
-      .map((holiday) => {
-        const date = normalizeHolidayDate(holiday?.date);
-        if (!date) return null;
-        return {
-          title: holiday?.name ? holiday.name : "공휴일",
-          start: toDate(date, 0, 0),
-          end: toDate(date, 23, 59),
-          raw: { ...holiday, leaveType: "공휴일", isHoliday: true },
-        };
-      })
-      .filter(Boolean);
+    const holidayEvents = mergeConsecutiveHolidayEvents(holidays);
 
     const includeLeave = showLeave;
     const includeOvertime = showOvertime;
@@ -626,9 +703,6 @@ export default function Schedule() {
     <View style={{ flex: 1, paddingTop: 12, backgroundColor: "#FFFFFF" }}>
       <View
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
           paddingHorizontal: 20,
           paddingTop: 8,
           paddingBottom: 8,
@@ -638,18 +712,96 @@ export default function Schedule() {
           elevation: 10,
         }}
       >
-        <Text style={{ fontSize: 22, fontWeight: "bold" }}>
-          {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
-        </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <TouchableOpacity
+              onPress={() =>
+                setCurrentDate((prev) =>
+                  normalizeForMode(moveByMode(prev, mode, -1), mode)
+                )
+              }
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 6,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 14, color: "#475569" }}>◀</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 22, fontWeight: "bold" }}>
+              {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
+            </Text>
+            <TouchableOpacity
+              onPress={() =>
+                setCurrentDate((prev) =>
+                  normalizeForMode(moveByMode(prev, mode, +1), mode)
+                )
+              }
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 6,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 14, color: "#475569" }}>▶</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View
-            style={{
-              position: "relative",
-              zIndex: 20,
-              elevation: 20,
-            }}
-          >
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                <View
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 3,
+                    backgroundColor: "#FCE7F3",
+                    borderWidth: 1,
+                    borderColor: "#F9A8D4",
+                  }}
+                />
+                <Text style={{ fontSize: 12, color: "#6B7280" }}>휴가</Text>
+              </View>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                <View
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 3,
+                    backgroundColor: "#E0F2FE",
+                    borderWidth: 1,
+                    borderColor: "#93C5FD",
+                  }}
+                />
+                <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                  연장근로
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View
+              style={{
+                position: "relative",
+                zIndex: 20,
+                elevation: 20,
+              }}
+            >
           <TouchableOpacity
             onPress={() => setDeptOpen(!deptOpen)}
             style={{
@@ -755,6 +907,8 @@ export default function Schedule() {
           />
         </View>
         </View>
+        </View>
+
       </View>
       <View
         style={{ flex: 1, zIndex: 0 }}

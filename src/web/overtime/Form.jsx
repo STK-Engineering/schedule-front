@@ -63,6 +63,7 @@ const parseTimeToMinutes = (value) => {
 
 const MIN_OVERTIME_MINUTES = 30;
 const MAX_OVERTIME_MINUTES = 12 * 60;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const getOvertimeDiffMinutes = (start, end) => {
   const startMinutes = parseTimeToMinutes(start);
@@ -110,6 +111,15 @@ const showIntervalAlert = () => {
   Alert.alert("입력 오류", message);
 };
 
+const showImageSizeAlert = () => {
+  const message = "이미지 용량은 5MB 이하만 첨부할 수 있습니다.";
+  if (typeof window !== "undefined" && typeof window.alert === "function") {
+    window.alert(message);
+    return;
+  }
+  Alert.alert("입력 오류", message);
+};
+
 export default function Form() {
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
@@ -122,7 +132,6 @@ export default function Form() {
   const [requestDate, setRequestDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [imageDropdownOpen, setImageDropdownOpen] = useState(true);
   const [attachments, setAttachments] = useState([]);
   const [isDragOverImageZone, setIsDragOverImageZone] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -248,9 +257,14 @@ export default function Form() {
 
     try {
       const file = files[0];
+      if (file.size > MAX_IMAGE_BYTES) {
+        showImageSizeAlert();
+        return;
+      }
       const uploaded = {
         id: `${Date.now()}-${file.name}`,
         name: file.name,
+        file,
         dataUrl: await fileToDataUrl(file),
       };
       setAttachments([uploaded]);
@@ -331,7 +345,7 @@ export default function Form() {
       return value;
     };
 
-    const payload = {
+    const overTimeRequest = {
       jobNumber,
       vesselName,
       hullNo,
@@ -339,18 +353,32 @@ export default function Form() {
       requestDate,
       startTime: withSeconds(normalizeTimeValue(startTime)),
       endTime: withSeconds(normalizeTimeValue(endTime)),
-      ...(attachments.length > 0
-        ? {
-            images: attachments.map((item) => ({
-              name: item.name,
-              dataUrl: item.dataUrl,
-            })),
-          }
-        : {}),
     };
 
+    const formData = new FormData();
+    const overTimeRequestBlob = new Blob([JSON.stringify(overTimeRequest)], {
+      type: "application/json",
+    });
+    formData.append("overTimeRequest", overTimeRequestBlob);
+
+    if (attachments.length > 0 && attachments[0]?.file) {
+      formData.append(
+        "file",
+        attachments[0].file,
+        attachments[0].file?.name || "upload",
+      );
+    } else {
+      const emptyFile = new Blob([], { type: "application/octet-stream" });
+      formData.append("file", emptyFile, "null");
+    }
+
     try {
-      await api.post("/overtime", payload);
+      await api.post("/overtime", formData, {
+        transformRequest: (data, headers) => {
+          if (headers) delete headers["Content-Type"];
+          return data;
+        },
+      });
       navigation.navigate("OverTimeStatus");
     } catch (err) {
       console.error("신청 실패", err);
@@ -383,7 +411,7 @@ export default function Form() {
             </Text>
           </View>
           <View style={styles.sectionDivider} />
-
+          
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldGroupTitle}>작업 정보</Text>
             <View style={styles.fieldRow}>
@@ -460,83 +488,70 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <View style={styles.imageSectionHeader}>
-              <Text style={styles.fieldGroupTitle}>이미지 첨부</Text>
-              <TouchableOpacity
-                style={styles.imageDropdownButton}
-                onPress={() => setImageDropdownOpen((prev) => !prev)}
-                activeOpacity={0.8}
+            <Text style={styles.fieldGroupTitle}>이미지 첨부</Text>
+
+            {Platform.OS === "web" ? (
+              <div
+                onDragEnter={handleImageDragEnter}
+                onDragOver={handleImageDragOver}
+                onDragLeave={handleImageDragLeave}
+                onDrop={handleImageDrop}
+                style={{
+                  ...StyleSheet.flatten([
+                    styles.imageAttachPanel,
+                    isDragOverImageZone && styles.imageAttachPanelActive,
+                  ]),
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
               >
-                <Text style={styles.imageDropdownButtonText}>
-                  {imageDropdownOpen ? "접기 ▲" : "펼치기 ▼"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {imageDropdownOpen && (
-              <>
-              {Platform.OS === "web" ? (
-                <div
-                  onDragEnter={handleImageDragEnter}
-                  onDragOver={handleImageDragOver}
-                  onDragLeave={handleImageDragLeave}
-                  onDrop={handleImageDrop}
-                  style={{
-                    ...StyleSheet.flatten([
-                      styles.imageAttachPanel,
-                      isDragOverImageZone && styles.imageAttachPanelActive,
-                    ]),
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                  }}
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  style={{ display: "none" }}
+                />
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={openImagePicker}
                 >
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    style={{ display: "none" }}
-                  />
-                  <TouchableOpacity
-                    style={styles.imageUploadButton}
-                    onPress={openImagePicker}
-                  >
-                    <Text style={styles.imageUploadButtonText}>이미지 선택</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.imageUploadButtonText}>이미지 선택</Text>
+                </TouchableOpacity>
 
-                  <Text style={styles.imageHintText}>
-                    드래그하거나 버튼으로 선택
-                  </Text>
+                <Text style={styles.imageHintText}>
+                  드래그하거나 버튼으로 선택 (최대 5MB)
+                </Text>
 
-                  {attachments.length > 0 && (
-                    <View style={styles.imageList}>
-                      {attachments.map((item) => (
-                        <View key={item.id} style={styles.imageCard}>
-                          <TouchableOpacity
-                            activeOpacity={0.85}
-                            onPress={() => openPreviewModal(item.dataUrl)}
-                          >
-                            <Image
-                              source={{ uri: item.dataUrl }}
-                              style={styles.imageThumb}
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.imageName} numberOfLines={1}>
-                            {item.name}
-                          </Text>
-                          <TouchableOpacity
-                            style={styles.imageRemoveButton}
-                            onPress={() => removeAttachment(item.id)}
-                          >
-                            <Text style={styles.imageRemoveButtonText}>삭제</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </div>
-              ) : (
+                {attachments.length > 0 && (
+                  <View style={styles.imageList}>
+                    {attachments.map((item) => (
+                      <View key={item.id} style={styles.imageCard}>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => openPreviewModal(item.dataUrl)}
+                        >
+                          <Image
+                            source={{ uri: item.dataUrl }}
+                            style={styles.imageThumb}
+                          />
+                        </TouchableOpacity>
+                        <Text style={styles.imageName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.imageRemoveButton}
+                          onPress={() => removeAttachment(item.id)}
+                        >
+                          <Text style={styles.imageRemoveButtonText}>삭제</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </div>
+            ) : (
               <View
                 style={[
                   styles.imageAttachPanel,
@@ -558,7 +573,7 @@ export default function Form() {
                 </TouchableOpacity>
 
                 <Text style={styles.imageHintText}>
-                  드래그하거나 버튼으로 선택
+                  드래그하거나 버튼으로 선택 (최대 5MB)
                 </Text>
 
                 {attachments.length > 0 && (
@@ -588,8 +603,6 @@ export default function Form() {
                   </View>
                 )}
               </View>
-              )}
-              </>
             )}
           </View>
 
@@ -881,27 +894,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textTransform: "uppercase",
     letterSpacing: 0.6,
-  },
-  imageSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-    gap: 10,
-  },
-  imageDropdownButton: {
-    height: 30,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 10,
-    justifyContent: "center",
-  },
-  imageDropdownButtonText: {
-    fontSize: 12,
-    color: "#334155",
-    fontWeight: "600",
   },
   imageAttachPanel: {
     borderWidth: 1,

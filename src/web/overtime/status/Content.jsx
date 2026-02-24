@@ -4,6 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Image,
+  Modal,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import PageLayout from "../../../components/PageLayout";
@@ -18,6 +20,8 @@ const STATUS_STYLE = {
 export default function StatusDetail({ route }) {
   const navigation = useNavigation();
   const params = route?.params ?? {};
+  const [previewModalOpen, setPreviewModalOpen] = React.useState(false);
+  const [previewImageUri, setPreviewImageUri] = React.useState("");
 
   const {
     name = "",
@@ -29,6 +33,7 @@ export default function StatusDetail({ route }) {
     requestDate = "",
     startTime = "",
     endTime = "",
+    imageUrl = "",
     status = "",
     rejectionReason = "—",
   } = params;
@@ -38,6 +43,16 @@ export default function StatusDetail({ route }) {
   const statusTheme = STATUS_STYLE[status] || STATUS_STYLE["대기"];
   const timeRange =
     startTime || endTime ? `${startTime || "-"} ~ ${endTime || "-"}` : "-";
+  const hasImage = Boolean(imageUrl);
+  const openPreviewModal = () => {
+    if (!imageUrl) return;
+    setPreviewImageUri(imageUrl);
+    setPreviewModalOpen(true);
+  };
+  const closePreviewModal = () => {
+    setPreviewModalOpen(false);
+    setPreviewImageUri("");
+  };
 
   return (
     <PageLayout
@@ -74,6 +89,26 @@ export default function StatusDetail({ route }) {
             <InfoRow label="요청일자" value={requestDate || "-"} />
             <InfoRow label="작업시간" value={timeRange} />
             <InfoRow label="작업내용" value={jobDescription || "-"} multiline />
+            <View style={styles.tableRow}>
+              <View style={styles.tableLabelCell}>
+                <Text style={styles.tableLabel}>이미지</Text>
+              </View>
+              <View style={styles.tableValueCell}>
+                {hasImage ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={openPreviewModal}
+                  >
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.previewImage}
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.tableValueEmpty}>첨부파일 없음</Text>
+                )}
+              </View>
+            </View>
             <InfoRow label="소속" value={department || "-"} />
             <InfoRow label="성명" value={name || "-"} isLast />
           </View>
@@ -101,6 +136,39 @@ export default function StatusDetail({ route }) {
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Text style={styles.backButtonText}>뒤로</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={previewModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closePreviewModal}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={closePreviewModal}
+          style={styles.previewModalOverlay}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={styles.previewModalBox}
+          >
+            {!!previewImageUri && (
+              <Image
+                source={{ uri: previewImageUri }}
+                style={styles.previewModalImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity
+              style={styles.previewModalCloseButton}
+              onPress={closePreviewModal}
+            >
+              <Text style={styles.previewModalCloseText}>닫기</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </PageLayout>
   );
 }
@@ -205,6 +273,47 @@ const styles = StyleSheet.create({
   tableLabel: { fontSize: 12, fontWeight: "600", color: "#475569" },
   tableValue: { fontSize: 14, color: "#0F172A", lineHeight: 20 },
   tableValueMultiline: { lineHeight: 20 },
+  tableValueEmpty: { fontSize: 14, color: "#94A3B8", lineHeight: 20 },
+  previewImage: {
+    width: 160,
+    height: 120,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+  },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  previewModalBox: {
+    width: "100%",
+    maxWidth: 900,
+    maxHeight: "90%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    gap: 12,
+  },
+  previewModalImage: {
+    width: "100%",
+    height: 480,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+  },
+  previewModalCloseButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    backgroundColor: "#0F172A",
+  },
+  previewModalCloseText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   messageHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -54,6 +54,7 @@ export default function Status() {
         requestDate: e.requestDate ?? "",
         startTime: e.startTime ?? "",
         endTime: e.endTime ?? "",
+        imageUrl: e.imageUrl ?? "",
 
         status: e.approvalStatusDisplay ?? "",
 

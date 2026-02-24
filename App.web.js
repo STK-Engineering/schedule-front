@@ -10,7 +10,6 @@ import Sidebar from "./src/components/Sidebar";
 
 import Login from "./src/web/Login";
 import SignUp from "./src/web/SignUp";
-import Find from "./src/web/Find";
 import Change from "./src/web/Change";
 import PasswordChange from "./src/web/PasswordChange";
 import Home from "./src/web/Home";
@@ -37,6 +36,10 @@ import Setting from "./src/web/manage/Setting";
 import ApprovalLine from "./src/web/manage/approval/ApprovalLine";
 import ApprovalLineContent from "./src/web/manage/approval/ApprovalLineContent";
 
+import SchedulingForm from "./src/web/scheduling/Form";
+import SchedulingList from "./src/web/scheduling/List";
+import SchedulingContent from "./src/web/scheduling/Content";
+
 const Stack = createStackNavigator();
 
 function AuthNavigator() {
@@ -44,7 +47,6 @@ function AuthNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={Login} />
       <Stack.Screen name="SignUp" component={SignUp} />
-      <Stack.Screen name="Find" component={Find} />
       <Stack.Screen name="Change" component={Change} />
     </Stack.Navigator>
   );
@@ -80,13 +82,17 @@ function AppNavigator() {
       <Stack.Screen name="Setting" component={Setting} />
       <Stack.Screen name="ApprovalLine" component={ApprovalLine} />
       <Stack.Screen name="ApprovalLineContent" component={ApprovalLineContent} />
+
+      <Stack.Screen name="SchedulingForm" component={SchedulingForm} />
+      <Stack.Screen name="SchedulingList" component={SchedulingList} />
+      <Stack.Screen name="SchedulingContent" component={SchedulingContent} />
     </Stack.Navigator>
   );
 }
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const { width } = useWindowDimensions();
   const isMobile = width < 800;
 
@@ -101,18 +107,20 @@ export default function App() {
       <LeaveBalanceProvider>
         <NavigationContainer ref={navigationRef}>
           <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
-            <View
-              style={{
-                zIndex: 10,
-                elevation: 10,
-                backgroundColor: "#FFFFFF",
-              }}
-            >
-              <Header
-                onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
-                isSidebarCollapsed={isSidebarCollapsed}
-              />
-            </View>
+            {isLoggedIn ? (
+              <View
+                style={{
+                  zIndex: 10,
+                  elevation: 10,
+                  backgroundColor: "#FFFFFF",
+                }}
+              >
+                <Header
+                  onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                />
+              </View>
+            ) : null}
             <View
               style={{
                 flex: 1,

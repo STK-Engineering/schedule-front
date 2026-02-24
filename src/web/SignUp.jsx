@@ -1,7 +1,15 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  StyleSheet,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import api from "../api/api";
+import AuthLayout from "./layout/AuthLayout";
 
 export default function SignUp() {
   const navigation = useNavigation();
@@ -57,152 +65,161 @@ export default function SignUp() {
   };
 
   return (
-    <View
-      style={{
-        flex: 1,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <View
-        style={{
-          width: "40%",
-          height: "60%",
-          justifyContent: "center",
-          alignItems: "center",
-          padding: 40,
-          borderRadius: 12,
-          backgroundColor: "white",
-        }}
-      >
-        <View
-          style={{
-            width: "100%",
-            justifyContent: "center",
-            alignItems: "flex-start",
-          }}
-        >
-          <Text style={{ fontSize: 18, fontWeight: 500, marginBottom: 30 }}>
-            회원가입
-          </Text>
+    <AuthLayout>
+      <View style={styles.cardAccent} />
+      <Text style={styles.title}>회원가입</Text>
+      <Text style={styles.subtitle}>
+        이메일 인증 후 계정을 생성할 수 있어요.
+      </Text>
 
-          <View
-            style={{
-              width: "100%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-            }}
-          >
-            <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
-              이메일
-            </Text>
-            <View
-              style={{
-                width: "100%",
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 10,
-                marginBottom: 10,
-              }}
-            >
-              <TextInput
-                style={{
-                  width: "100%",
-                  borderWidth: 1,
-                  borderColor: "#121D6D",
-                  padding: 14,
-                  borderRadius: 8,
-                  outlineStyle: "none",
-                  outlineWidth: 0,
-                }}
-                placeholder="이메일 주소를 입력해주세요."
-                value={email}
-                onChangeText={(text) => setEmail(text)}
-              />
-              <TouchableOpacity
-                style={{
-                  backgroundColor: "#121D6D",
-                  paddingHorizontal: 20,
-                  paddingVertical: 14,
-                  borderRadius: 8,
-                }}
-                onPress={handleSendEmail}
-              >
-                <Text style={{ color: "white" }}>인증번호 받기</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
-            인증번호
-          </Text>
+      <View style={styles.form}>
+        <Text style={styles.label}>이메일</Text>
+        <View style={styles.inlineRow}>
           <TextInput
-            style={{
-              width: "100%",
-              borderWidth: 1,
-              borderColor: "#121D6D",
-              padding: 14,
-              marginBottom: 10,
-              borderRadius: 8,
-              outlineStyle: "none",
-              outlineWidth: 0,
-            }}
-            placeholder="인증번호를 입력해주세요."
-            value={authCode}
-            onChangeText={(text) => setAuthCode(text)}
-          />
-          <Text style={{ fontSize: 14, fontWeight: 400, marginBottom: 5 }}>
-            비밀번호
-          </Text>
-          <TextInput
-            style={{
-              width: "100%",
-              borderWidth: 1,
-              borderColor: "#121D6D",
-              padding: 14,
-              marginBottom: 14,
-              borderRadius: 8,
-              outlineStyle: "none",
-              outlineWidth: 0,
-            }}
-            placeholder="비밀번호를 입력해주세요."
-            value={password}
-            onChangeText={(text) => setPassword(text)}
+            style={[styles.input, styles.flexInput]}
+            placeholder="이메일 주소를 입력해주세요."
+            placeholderTextColor="#9CA3AF"
+            value={email}
+            onChangeText={(text) => setEmail(text)}
+            autoCapitalize="none"
           />
           <TouchableOpacity
-            style={{
-              borderWidth: 1,
-              borderColor: "#121D6D",
-              width: "100%",
-              paddingVertical: 16,
-              borderRadius: 8,
-            }}
-            onPress={handleSignUp}
+            style={styles.inlineButton}
+            onPress={handleSendEmail}
           >
-            <Text style={{ color: "#121D6D", textAlign: "center" }}>
-              회원가입
-            </Text>
+            <Text style={styles.inlineButtonText}>인증번호 받기</Text>
           </TouchableOpacity>
         </View>
-        <View>
-          <View
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              gap: 10,
-              marginTop: 35,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>이미 계정이 있으신가요?</Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-              <Text style={{  color: "#121D6D", fontSize: 16 }}>로그인</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+
+        <Text style={styles.label}>인증번호</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="인증번호를 입력해주세요."
+          placeholderTextColor="#9CA3AF"
+          value={authCode}
+          onChangeText={(text) => setAuthCode(text)}
+        />
+
+        <Text style={styles.label}>비밀번호</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="비밀번호를 입력해주세요."
+          placeholderTextColor="#9CA3AF"
+          secureTextEntry
+          value={password}
+          onChangeText={(text) => setPassword(text)}
+        />
+
+        <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp}>
+          <Text style={styles.primaryButtonText}>회원가입</Text>
+        </TouchableOpacity>
       </View>
-    </View>
+
+      <View style={styles.footerRow}>
+        <Text style={styles.footerText}>이미 계정이 있으신가요?</Text>
+        <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+          <Text style={styles.footerLink}>로그인</Text>
+        </TouchableOpacity>
+      </View>
+    </AuthLayout>
   );
 }
+
+const FONT_TITLE = "Space Grotesk";
+const FONT_BODY = "Manrope";
+
+const styles = StyleSheet.create({
+  cardAccent: {
+    height: 3,
+    borderRadius: 6,
+    backgroundColor: "#121D6D",
+    marginBottom: 6,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1F2933",
+    fontFamily: FONT_TITLE,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+    fontFamily: FONT_BODY,
+  },
+  form: {
+    gap: 7,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1F2933",
+    fontFamily: FONT_BODY,
+  },
+  input: {
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#121D6D",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    fontSize: 14,
+    color: "#1F2933",
+    outlineStyle: "none",
+    outlineWidth: 0,
+    fontFamily: FONT_BODY,
+  },
+  flexInput: {
+    flex: 1,
+    minWidth: 180,
+  },
+  inlineRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  inlineButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: "#121D6D",
+  },
+  inlineButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: FONT_BODY,
+  },
+  primaryButton: {
+    backgroundColor: "#121D6D",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 6,
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: FONT_BODY,
+  },
+  footerRow: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  footerText: {
+    fontSize: 13,
+    color: "#6B7280",
+    fontFamily: FONT_BODY,
+  },
+  footerLink: {
+    fontSize: 13,
+    color: "#121D6D",
+    fontWeight: "700",
+    fontFamily: FONT_BODY,
+  },
+});

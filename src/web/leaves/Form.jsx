@@ -558,12 +558,14 @@ export default function Form() {
                     </React.Fragment>
                   )
                 )}
+                  {leaveType === "경조사" ? (
                 <View style={styles.reasonHintRow}>
                   <Text style={styles.reasonHint}>
                     *사유(최대 사용가능 일자) / 출산(20일)을 제외한 모든
                     경조사는 주말, 공휴일이 포함되어 계산됩니다.
                   </Text>
                 </View>
+                  ) : null}
               </View>
             ) : (
               <TextInput
@@ -635,30 +637,34 @@ export default function Form() {
             />
             <PreviewRow label="사유" value={reason || "-"} />
             <PreviewRow label="기타 사항" value={etc || "-"} multiline />
-            <PreviewRow
-              label="총 휴가 일수"
-              value={
-                isCurrentYear
-                  ? balancesLoading
-                    ? "-"
-                    : `${balances.totalDays}일`
-                  : "당해연도건만 확인할 수 있습니다."
-              }
-              valueStyle={!isCurrentYear ? styles.balanceNotice : undefined}
-              multiline={!isCurrentYear}
-            />
-            <PreviewRow
-              label="잔여 일수"
-              value={
-                isCurrentYear
-                  ? balancesLoading
-                    ? "-"
-                    : `${balances.remainingDays}일`
-                  : "당해연도건만 확인할 수 있습니다."
-              }
-              valueStyle={!isCurrentYear ? styles.balanceNotice : undefined}
-              multiline={!isCurrentYear}
-            />
+            {leaveType !== "경조사" && leaveType !== "기타" && (
+              <>
+                <PreviewRow
+                  label="총 휴가 일수"
+                  value={
+                    isCurrentYear
+                      ? balancesLoading
+                        ? "-"
+                        : `${balances.totalDays}일`
+                      : "당해연도건만 확인할 수 있습니다."
+                  }
+                  valueStyle={!isCurrentYear ? styles.balanceNotice : undefined}
+                  multiline={!isCurrentYear}
+                />
+                <PreviewRow
+                  label="잔여 일수"
+                  value={
+                    isCurrentYear
+                      ? balancesLoading
+                        ? "-"
+                        : `${balances.remainingDays}일`
+                      : "당해연도건만 확인할 수 있습니다."
+                  }
+                  valueStyle={!isCurrentYear ? styles.balanceNotice : undefined}
+                  multiline={!isCurrentYear}
+                />
+              </>
+            )}
           </View>
         </View>
 

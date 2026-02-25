@@ -556,18 +556,20 @@ export default function Header({ onToggleSidebar }) {
         <TouchableOpacity
           onPress={isLoggedIn ? goSchedule : goLogin}
           style={{
-            backgroundColor: isLoggedIn ? "#ffffff" : "#121D6D",
-            borderColor: isLoggedIn ? "#000000ff" : "#121D6D",
+            backgroundColor: isLoggedIn ? "#FFFFFF" : "#121D6D",
+            borderColor: isLoggedIn ? "#E2E8F0" : "#121D6D",
             borderWidth: 1,
             paddingVertical: 8,
-            paddingHorizontal: 16,
+            paddingHorizontal: 14,
             borderRadius: 8,
+            minWidth: 120,
+            alignItems: "center",
           }}
         >
           <Text
             style={{
-              fontSize: 18,
-              fontWeight: "400",
+              fontSize: 15,
+              fontWeight: "500",
               color: isLoggedIn ? "#0F172A" : "white",
             }}
           >

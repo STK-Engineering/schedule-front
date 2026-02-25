@@ -85,8 +85,9 @@ const formatDate = (value) => {
 
 export default function Home() {
   const navigation = useNavigation();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isNarrow = width < 1024;
+  const cardMinHeight = Math.max(620, Math.floor(height * 0.72));
   const { version } = useContext(LeaveBalanceContext);
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [calendarLeaves, setCalendarLeaves] = useState([]);
@@ -137,11 +138,21 @@ export default function Home() {
         const done = leaveRes.data?.["요청 처리 건"] ?? [];
         const mapItem = (e) => ({
           id: e.id,
+          name: e.employee?.name ?? balanceData.name ?? balanceData.employee?.name ?? "",
+          department:
+            e.employee?.department?.name ??
+            balanceData.department ??
+            balanceData.employee?.department?.name ??
+            "",
+          position: e.employee?.level ?? balanceData.level ?? "사원",
           type: e.leaveType ?? "",
           startDate: e.startDate,
           endDate: e.endDate,
           usedDay: e.usedDay,
+          reason: e.reason ?? "",
+          etc: e.etc ?? "",
           status: e.approvalStatusDisplay ?? "",
+          rejectionReason: e.rejectionReason ?? "—",
         });
         setLeaveSummary({
           waiting: waiting.map(mapItem),
@@ -318,7 +329,13 @@ export default function Home() {
       </View>
       
            <View style={[styles.gridRow, isNarrow && styles.gridRowStack]}>
-        <View style={[styles.card, styles.balanceCard]}>
+        <View
+          style={[
+            styles.card,
+            styles.balanceCard,
+            !isNarrow && { minHeight: cardMinHeight },
+          ]}
+        >
           <View style={styles.cardTitleRow}>
             <View>
               <Text style={styles.cardTitle}>연차 현황</Text>
@@ -356,7 +373,7 @@ export default function Home() {
             </Text>
           </View>
 
-          <View style={styles.quickCard}>
+          <View style={[styles.quickCard, { marginTop: 28 }]}>
             <Text style={styles.quickCardTitle}>바로가기</Text>
             <Text style={styles.quickCardSubtitle}>
               자주 쓰는 신청서로 빠르게 이동하세요.
@@ -416,7 +433,13 @@ export default function Home() {
 
         
 
-        <View style={[styles.card, styles.statusCard]}>
+        <View
+          style={[
+            styles.card,
+            styles.statusCard,
+            !isNarrow && { minHeight: cardMinHeight },
+          ]}
+        >
           <Text style={styles.cardTitle}>연차 진행 상황</Text>
           <Text style={styles.cardCaption}>요청 현황 요약</Text>
           <View style={styles.statusRow}>
@@ -444,7 +467,12 @@ export default function Home() {
               recentRequests.map((item) => {
                 const theme = STATUS_STYLE[item.status] || STATUS_STYLE["대기"];
                 return (
-                  <View key={item.id} style={styles.recentRow}>
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.recentRow}
+                    activeOpacity={0.7}
+                    onPress={() => navigation.navigate("LeaveStatusContent", item)}
+                  >
                     <View style={styles.recentInfo}>
                       <Text style={styles.recentType}>{item.type || "-"}</Text>
                       <Text style={styles.recentDate}>
@@ -464,7 +492,7 @@ export default function Home() {
                         {item.status || "-"}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             )}

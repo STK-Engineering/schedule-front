@@ -42,6 +42,49 @@ import SchedulingContent from "./src/web/scheduling/Content";
 
 const Stack = createStackNavigator();
 
+const ROUTE_TITLE_MAP = {
+  Login: "로그인",
+  SignUp: "회원가입",
+  Change: "비밀번호 재설정",
+  PasswordChange: "비밀번호 변경",
+  Home: "홈",
+  Schedule: "일정",
+  LeaveStatus: "내 휴가 신청 내역",
+  LeaveStatusContent: "휴가 신청 상세",
+  LeaveRequest: "휴가 결재 요청",
+  LeaveRequestContent: "휴가 요청 상세",
+  LeaveForm: "휴가 신청",
+  LeaveEdit: "휴가 수정",
+  LeaveApplication: "승인된 휴가",
+  OverTimeStatus: "내 연장 근로 신청 내역",
+  OverTimeStatusContent: "연장 근로 신청 상세",
+  OverTimeRequest: "연장 근로 결재 요청",
+  OverTimeRequestContent: "연장 근로 요청 상세",
+  OverTimeForm: "연장 근로 신청",
+  OverTimeEdit: "연장 근로 수정",
+  OverTimeApplication: "승인된 연장 근로",
+  DepartmentLeave: "연차 현황 관리",
+  Setting: "사용자 관리",
+  ApprovalLine: "결재 라인 관리",
+  ApprovalLineContent: "결재 라인 상세",
+  SchedulingForm: "일정 등록",
+  SchedulingList: "일정 관리",
+  SchedulingContent: "일정 상세",
+};
+
+const getActiveRouteName = (state) => {
+  if (!state) return null;
+  const route = state.routes?.[state.index ?? 0];
+  if (!route) return null;
+  return route.state ? getActiveRouteName(route.state) : route.name;
+};
+
+const setWebTitle = (routeName) => {
+  if (typeof document === "undefined") return;
+  const title = ROUTE_TITLE_MAP[routeName] ?? routeName ?? "STK";
+  document.title = title;
+};
+
 function AuthNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -105,7 +148,11 @@ export default function App() {
     
     <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn }}>
       <LeaveBalanceProvider>
-        <NavigationContainer ref={navigationRef}>
+        <NavigationContainer
+          ref={navigationRef}
+          onReady={() => setWebTitle(navigationRef.getCurrentRoute()?.name)}
+          onStateChange={(state) => setWebTitle(getActiveRouteName(state))}
+        >
           <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
             {isLoggedIn ? (
               <View

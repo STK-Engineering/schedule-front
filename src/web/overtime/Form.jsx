@@ -784,10 +784,7 @@ export default function Form() {
                 resizeMode="contain"
               />
             )}
-            <TouchableOpacity
-              style={styles.previewModalCloseButton}
-              onPress={closePreviewModal}
-            >
+            <TouchableOpacity onPress={closePreviewModal}>
               <Text style={styles.previewModalCloseText}>닫기</Text>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -1124,36 +1121,29 @@ const styles = StyleSheet.create({
   },
   previewModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.7)",
     padding: 20,
   },
   previewModalBox: {
     width: "100%",
     maxWidth: 900,
+    maxHeight: "90%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    padding: 16,
+    alignItems: "center",
+    gap: 12,
   },
   previewModalImage: {
     width: "100%",
-    height: 560,
+    height: 480,
     backgroundColor: "#F8FAFC",
-    borderRadius: 8,
-  },
-  previewModalCloseButton: {
-    alignSelf: "flex-end",
-    marginTop: 10,
-    backgroundColor: "#121D6D",
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    borderRadius: 12,
   },
   previewModalCloseText: {
-    color: "#FFFFFF",
+    color: "#64748B",
     fontSize: 13,
     fontWeight: "600",
   },

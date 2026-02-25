@@ -160,10 +160,7 @@ export default function StatusDetail({ route }) {
                 resizeMode="contain"
               />
             )}
-            <TouchableOpacity
-              style={styles.previewModalCloseButton}
-              onPress={closePreviewModal}
-            >
+            <TouchableOpacity onPress={closePreviewModal}>
               <Text style={styles.previewModalCloseText}>닫기</Text>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -201,7 +198,7 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 5,
     padding: 20,
     borderWidth: 1,
     borderColor: "#E2E8F0",
@@ -303,14 +300,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#F8FAFC",
   },
-  previewModalCloseButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 999,
-    backgroundColor: "#0F172A",
-  },
   previewModalCloseText: {
-    color: "#FFFFFF",
+    color: "#64748B",
     fontSize: 13,
     fontWeight: "600",
   },

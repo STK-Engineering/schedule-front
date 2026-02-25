@@ -60,11 +60,11 @@ export default function Change() {
         newPassword,
       });
 
-      console.log("비밀번호 변경 성공:", response.data);
+      console.log("비밀번호 재설정 성공:", response.data);
       navigation.navigate("Login");
     } catch (error) {
       Alert.alert(
-        "비밀번호 변경 실패",
+        "비밀번호 재설정 실패",
         error.response?.data?.message || "서버 오류",
       );
     }
@@ -141,7 +141,7 @@ export default function Change() {
         ) : null}
 
         <TouchableOpacity style={styles.primaryButton} onPress={handleChange}>
-          <Text style={styles.primaryButtonText}>변경</Text>
+          <Text style={styles.primaryButtonText}>재설정</Text>
         </TouchableOpacity>
       </View>
 

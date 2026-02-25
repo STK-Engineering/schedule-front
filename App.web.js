@@ -149,20 +149,22 @@ export default function App() {
                 {isLoggedIn ? <AppNavigator /> : <AuthNavigator />}
               </View>
             </View>
-            <View
-              style={{
-                height: 25,
-                borderTopWidth: 1,
-                borderColor: "#E2E8F0",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "#FFFFFF",
-              }}
-            >
-              <Text style={{ color: "#64748B", fontSize: 12 }}>
-                Copyright © STK Engineering All Rights Reserved.
-              </Text>
-            </View>
+            {isLoggedIn ? (
+              <View
+                style={{
+                  height: 25,
+                  borderTopWidth: 1,
+                  borderColor: "#E2E8F0",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "#FFFFFF",
+                }}
+              >
+                <Text style={{ color: "#64748B", fontSize: 12 }}>
+                  Copyright © STK Engineering All Rights Reserved.
+                </Text>
+              </View>
+            ) : null}
           </SafeAreaView>
         </NavigationContainer>
       </LeaveBalanceProvider>

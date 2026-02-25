@@ -5,9 +5,8 @@ import {
   StyleSheet,
   ImageBackground,
   Image,
-  useWindowDimensions,
 } from "react-native";
-import SideBackground from "../../../assets/img/1.png";
+import SideBackground from "../../../assets/img/login.webp";
 import WhiteLogo from "../../../assets/logo/white_logo.png";
 
 const FONT_BODY = "Manrope";
@@ -15,16 +14,13 @@ const DEFAULT_SIDE_NOTE =
   "본 서비스는 사내 서비스로, \n (주)에스티케이엔지니어링 직원에 한하여 사용 가능합니다.";
 
 export default function AuthLayout({ children }) {
-  const { width } = useWindowDimensions();
-  const isNarrow = width < 900;
-
   return (
     <View style={styles.page}>
       <View style={styles.card}>
-        <View style={[styles.cardRow, isNarrow && styles.cardRowStack]}>
+        <View style={styles.cardRow}>
           <ImageBackground
             source={SideBackground}
-            style={[styles.sidePanel, isNarrow && styles.sidePanelStack]}
+            style={styles.sidePanel}
             imageStyle={styles.sidePanelImage}
           >
             <Image
@@ -45,6 +41,9 @@ export default function AuthLayout({ children }) {
           <View style={styles.formPanel}>{children}</View>
         </View>
       </View>
+      <Text style={styles.copyright}>
+        Copyright © STK Engineering All Rights Reserved.
+      </Text>
     </View>
   );
 }
@@ -76,9 +75,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "stretch",
   },
-  cardRowStack: {
-    flexDirection: "column",
-  },
   sidePanel: {
     width: 280,
     minHeight: 450,
@@ -108,11 +104,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     zIndex: 2,
   },
-  sidePanelStack: {
-    width: "100%",
-    borderRightWidth: 0,
-    borderBottomWidth: 1,
-  },
   sideNote: {
     color: "#FFFFFF",
     fontSize: 14,
@@ -131,5 +122,12 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 36,
     gap: 16,
+  },
+  copyright: {
+    marginTop: 40,
+    fontSize: 14,
+    color: "#6d7177ff",
+    fontFamily: FONT_BODY,
+    textAlign: "center",
   },
 });

@@ -696,7 +696,7 @@ export default function Form() {
                 체크란을 클릭해주세요.
               </Text>
               <Text style={styles.checkWarn}>
-                *휴가 사용 계획서는 사용 일자로부터 하루 전까지 취소와 수정이
+                *휴가 사용 신청서는 사용 일자로부터 하루 전까지 취소와 수정이
                 가능합니다.
               </Text>
             </View>

@@ -720,6 +720,10 @@ export default function Form() {
                 위의 내용에 오탈자, 틀린 내용이 없는 지 최종적으로 확인 후,
                 체크란을 클릭해주세요.
               </Text>
+              <Text style={styles.checkWarn}>
+                *연장 근로 신청서는 사용 일자로부터 하루 전까지 취소와 수정이
+                가능합니다.
+              </Text>
             </View>
           </View>
 
@@ -1047,13 +1051,20 @@ const styles = StyleSheet.create({
   },
   checkbox: { margin: 0, marginRight: 8 },
   checkTextWrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 5,
     flex: 1,
     minWidth: 0,
-    justifyContent: "center",
   },
   checkText: {
     fontSize: 12.5,
     color: "#0F172A",
+    flexShrink: 1,
+  },
+  checkWarn: {
+    color: "red",
+    fontSize: 12,
     flexShrink: 1,
   },
   previewHeader: {

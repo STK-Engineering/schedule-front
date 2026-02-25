@@ -3,8 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
 
 const isWeb = typeof window !== "undefined";
-// const BASE_URL = "https://schedule.stkkr.com/";
-const BASE_URL = "http://localhost:8080/";
+const BASE_URL = "https://schedule.stkkr.com/";
+// const BASE_URL = "http://localhost:8080/";
 
 const api = axios.create({
   baseURL: BASE_URL,

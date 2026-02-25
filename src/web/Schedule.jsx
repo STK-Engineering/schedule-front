@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRoute } from "@react-navigation/native";
 import {
   View,
@@ -27,12 +27,16 @@ function leaveTypeToTimeRange(leaveType) {
 }
 
 function toDate(dateStr, h, m) {
-  const [y, mo, d] = dateStr.split("-").map(Number);
+  const dateKey = normalizeHolidayDate(dateStr);
+  if (!dateKey) return null;
+  const [y, mo, d] = dateKey.split("-").map(Number);
   return new Date(y, mo - 1, d, h, m, 0);
 }
 
 function toDateOnly(dateStr) {
-  const [y, mo, d] = dateStr.split("-").map(Number);
+  const dateKey = normalizeHolidayDate(dateStr);
+  if (!dateKey) return null;
+  const [y, mo, d] = dateKey.split("-").map(Number);
   return new Date(y, mo - 1, d, 0, 0, 0);
 }
 
@@ -49,8 +53,8 @@ function leaveToEvents(item, holidayDateSet) {
   const { startH, startM, endH, endM } = leaveTypeToTimeRange(leaveType);
 
   const title = `${empName}${deptName ? ` (${deptName})` : ""} - ${leaveType}`;
-  const startDate = item?.startDate;
-  const endDate = item?.endDate || startDate;
+  const startDate = normalizeHolidayDate(item?.startDate);
+  const endDate = normalizeHolidayDate(item?.endDate) || startDate;
   if (!startDate || !endDate) return [];
 
   const isAnnualLeave = leaveType === "연차";
@@ -58,36 +62,57 @@ function leaveToEvents(item, holidayDateSet) {
   if (!isAnnualLeave) {
     const start = toDate(startDate, startH, startM);
     const end = toDate(endDate, endH, endM);
+    if (!start || !end) return [];
     return [{ title, start, end, isMine: item?.isMine ?? false, raw: item }];
   }
 
-  const events = [];
+  const includedDates = [];
   let cursor = toDateOnly(startDate);
   const last = toDateOnly(endDate);
+  if (!cursor || !last) return [];
 
   while (cursor <= last) {
     if (!isWeekend(cursor)) {
-      const dateKey = `${cursor.getFullYear()}-${String(
-        cursor.getMonth() + 1,
-      ).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
-      if (holidayDateSet?.has(dateKey)) {
-        cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
-        continue;
+      const dateKey = toDateKey(cursor);
+      if (!holidayDateSet?.has(dateKey)) {
+        includedDates.push(dateKey);
       }
-      const start = toDate(dateKey, startH, startM);
-      const end = toDate(dateKey, endH, endM);
-      events.push({
+    }
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+  }
+
+  if (!includedDates.length) return [];
+
+  const ranges = [];
+  let rangeStart = includedDates[0];
+  let rangeEnd = includedDates[0];
+
+  for (let i = 1; i < includedDates.length; i += 1) {
+    const current = includedDates[i];
+    if (isNextDateKey(rangeEnd, current)) {
+      rangeEnd = current;
+    } else {
+      ranges.push([rangeStart, rangeEnd]);
+      rangeStart = current;
+      rangeEnd = current;
+    }
+  }
+  ranges.push([rangeStart, rangeEnd]);
+
+  return ranges
+    .map(([rangeStartKey, rangeEndKey]) => {
+      const start = toDate(rangeStartKey, startH, startM);
+      const end = toDate(rangeEndKey, endH, endM);
+      if (!start || !end) return null;
+      return {
         title,
         start,
         end,
         isMine: item?.isMine ?? false,
         raw: item,
-      });
-    }
-    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
-  }
-
-  return events;
+      };
+    })
+    .filter(Boolean);
 }
 
 function parseTimeToParts(time) {
@@ -316,9 +341,18 @@ export default function Schedule() {
 
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [eventPopoverPos, setEventPopoverPos] = useState({ x: 0, y: 0 });
+  const [containerRect, setContainerRect] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+  });
+  const lastPointerRef = useRef(null);
   const [dayEventsModalOpen, setDayEventsModalOpen] = useState(false);
   const [dayEvents, setDayEvents] = useState([]);
   const [dayEventsDate, setDayEventsDate] = useState(null);
+  const calendarWrapRef = useRef(null);
 
   const [mode, setMode] = useState("month");
   const [currentDate, setCurrentDate] = useState(() =>
@@ -331,9 +365,44 @@ export default function Schedule() {
   const [showLeave, setShowLeave] = useState(true);
   const [showOvertime, setShowOvertime] = useState(true);
 
-  const openEventModal = (event) => {
+  const openEventModal = (event, pressEvent) => {
     setSelectedEvent(event);
     setEventModalOpen(true);
+    const popWidth = 360;
+    const popHeight = 400;
+    const maxX = Math.max(
+      8,
+      (containerRect.width || popWidth + 16) - popWidth - 8
+    );
+    const maxY = Math.max(
+      8,
+      (containerRect.height || popHeight + 16) - popHeight - 8
+    );
+    const pointer =
+      pressEvent?.nativeEvent?.pageX != null
+        ? {
+            x: pressEvent.nativeEvent.pageX,
+            y: pressEvent.nativeEvent.pageY,
+          }
+        : lastPointerRef.current;
+
+    if (pointer?.x != null && pointer?.y != null) {
+      const rawX = pointer.x - (containerRect.x || 0);
+      const rawY = pointer.y - (containerRect.y || 0);
+      const x = Math.min(Math.max(8, rawX + 12), maxX);
+      const y = Math.min(Math.max(8, rawY + 12), maxY);
+      setEventPopoverPos({ x, y });
+      return;
+    }
+    const fallbackX =
+      containerRect.width > 0
+        ? Math.min(Math.max(8, (containerRect.width - popWidth) / 2), maxX)
+        : 16;
+    const fallbackY =
+      containerRect.height > 0
+        ? Math.min(Math.max(8, (containerRect.height - popHeight) / 2), maxY)
+        : 16;
+    setEventPopoverPos({ x: fallbackX, y: fallbackY });
   };
 
   const openDayEventsModal = (date, list) => {
@@ -619,6 +688,10 @@ export default function Schedule() {
   const onMouseDown = (e) => {
     if (Platform.OS !== "web") return;
     const x = e?.nativeEvent?.pageX;
+    const y = e?.nativeEvent?.pageY;
+    if (typeof x === "number" && typeof y === "number") {
+      lastPointerRef.current = { x, y };
+    }
     if (typeof x === "number") setDragStartX(x);
   };
 
@@ -645,6 +718,10 @@ export default function Schedule() {
 
   const onTouchStart = (e) => {
     const x = e?.nativeEvent?.pageX;
+    const y = e?.nativeEvent?.pageY;
+    if (typeof x === "number" && typeof y === "number") {
+      lastPointerRef.current = { x, y };
+    }
     if (typeof x === "number") setDragStartX(x);
   };
 
@@ -901,7 +978,7 @@ export default function Schedule() {
             onPress={() => setShowLeave((v) => !v)}
           />
           <FilterCheckbox
-            label="연장"
+            label="연장 근로"
             checked={showOvertime}
             onPress={() => setShowOvertime((v) => !v)}
           />
@@ -911,7 +988,16 @@ export default function Schedule() {
 
       </View>
       <View
-        style={{ flex: 1, zIndex: 0 }}
+        ref={calendarWrapRef}
+        onLayout={() => {
+          if (Platform.OS !== "web") return;
+          if (calendarWrapRef.current?.measureInWindow) {
+            calendarWrapRef.current.measureInWindow((x, y, width, height) => {
+              setContainerRect({ x, y, width, height });
+            });
+          }
+        }}
+        style={{ flex: 1, zIndex: 0, position: "relative" }}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
         onTouchStart={onTouchStart}
@@ -943,19 +1029,26 @@ export default function Schedule() {
           onPressDateHeader={(date) =>
             openDayEventsModal(date, getEventsForDate(date))
           }
-          renderEvent={(event, touchableOpacityProps) => (
-            (() => {
-              const style = getLeaveTypeStyle(event?.raw?.leaveType ?? "");
-              return (
-            <DefaultCalendarEventRenderer
-              event={event}
-              touchableOpacityProps={touchableOpacityProps}
-              textColor={style.text ?? "#334155"}
-              showTime={false}
-            />
-              );
-            })()
-          )}
+          renderEvent={(event, touchableOpacityProps) => {
+            const style = getLeaveTypeStyle(event?.raw?.leaveType ?? "");
+            const mergedProps = {
+              ...touchableOpacityProps,
+              onPress: (e) => {
+                openEventModal(event, e);
+                if (touchableOpacityProps?.onPress) {
+                  touchableOpacityProps.onPress(e);
+                }
+              },
+            };
+            return (
+              <DefaultCalendarEventRenderer
+                event={event}
+                touchableOpacityProps={mergedProps}
+                textColor={style.text ?? "#334155"}
+                showTime={false}
+              />
+            );
+          }}
           eventCellStyle={(e) => {
             const leaveType = e?.raw?.leaveType ?? "";
             const style = getLeaveTypeStyle(leaveType);
@@ -966,146 +1059,218 @@ export default function Schedule() {
               borderRadius: 6,
             };
           }}
-          onPressEvent={openEventModal}
+          onPressEvent={(event, e) => openEventModal(event, e)}
         />
-      </View>
-      <Modal
-        visible={eventModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={closeEventModal}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={closeEventModal}
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.35)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 20,
-          }}
-        >
+
+        {Platform.OS === "web" && eventModalOpen ? (
           <TouchableOpacity
             activeOpacity={1}
-            onPress={() => {}}
+            onPress={closeEventModal}
             style={{
-              width: "100%",
-              maxWidth: 460,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "transparent",
+              zIndex: 40,
+            }}
+          />
+        ) : null}
+
+        {Platform.OS === "web" && eventModalOpen && selectedEvent ? (
+          <View
+            style={{
+              position: "absolute",
+              top: eventPopoverPos.y,
+              left: eventPopoverPos.x,
+              width: 360,
               backgroundColor: "#FFFFFF",
-              borderRadius: 20,
-              padding: 18,
+              borderRadius: 10,
               borderWidth: 1,
               borderColor: "#E2E8F0",
+              padding: 20,
               shadowColor: "#0F172A",
-              shadowOpacity: 0.15,
-              shadowRadius: 16,
-              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.08,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 6 },
               elevation: 6,
+              zIndex: 50,
             }}
           >
+            {(() => {
+              const isHoliday = detail?.isHoliday;
+              const isOvertime = detail?.isOvertime || leaveType === "연장근로";
+              const dotColor = isHoliday
+                ? getLeaveTypeStyle("공휴일").border
+                : isOvertime
+                ? getLeaveTypeStyle("연장근로").border
+                : getLeaveTypeStyle(leaveType || "연차").border;
+              return (
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: 12,
+                marginBottom: 18,
               }}
             >
-              <View>
-                <Text style={{ fontSize: 20, fontWeight: "bold" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 999,
+                    backgroundColor: dotColor,
+                  }}
+                />
+                <Text
+                  style={{ fontSize: 18, fontWeight: "700", color: "#0F172A" }}
+                >
                   일정 상세
                 </Text>
               </View>
+              <TouchableOpacity onPress={closeEventModal}>
+                <Text style={{ fontSize: 14, color: "#64748B" }}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+              );
+            })()}
+
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                이름
+              </Text>
+              <Text style={{ fontSize: 16, color: "#0F172A" }}>
+                {displayName}
+              </Text>
+            </View>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                종류
+              </Text>
+              <Text style={{ fontSize: 16, color: "#0F172A" }}>
+                {leaveType}
+              </Text>
+            </View>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                기간
+              </Text>
+              <Text style={{ fontSize: 16, color: "#0F172A" }}>
+                {timeLabel}
+              </Text>
+            </View>
+            {!detail?.isHoliday && (
+              <View>
+                <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                  사유
+                </Text>
+                <Text style={{ fontSize: 16, color: "#0F172A" }}>
+                  {detail?.reason ?? "-"}
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : null}
+      </View>
+      {Platform.OS !== "web" && (
+        <Modal
+          visible={eventModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={closeEventModal}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={closeEventModal}
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.35)",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: 20,
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => {}}
+              style={{
+                width: "100%",
+                maxWidth: 460,
+                backgroundColor: "#FFFFFF",
+                borderRadius: 20,
+                padding: 18,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                shadowColor: "#0F172A",
+                shadowOpacity: 0.15,
+                shadowRadius: 16,
+                shadowOffset: { width: 0, height: 8 },
+                elevation: 6,
+              }}
+            >
               <View
                 style={{
                   flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginBottom: 14,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
                 }}
               >
-                <View
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    borderRadius: 999,
-                    backgroundColor: "#DBEAFE",
-                  }}
-                >
-                  <Text style={{ color: "#121D6D", fontWeight: "bold" }}>
-                    {leaveType}
+                <View>
+                  <Text style={{ fontSize: 20, fontWeight: "bold" }}>
+                    일정 상세
                   </Text>
                 </View>
                 <View
                   style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    borderRadius: 999,
-                    backgroundColor: "#E2E8F0",
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginBottom: 14,
                   }}
                 >
-                  <Text style={{ color: "#334155" }}>{departmentName}</Text>
+                  <View
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 999,
+                      backgroundColor: "#DBEAFE",
+                    }}
+                  >
+                    <Text style={{ color: "#121D6D", fontWeight: "bold" }}>
+                      {leaveType}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 999,
+                      backgroundColor: "#E2E8F0",
+                    }}
+                  >
+                    <Text style={{ color: "#334155" }}>{departmentName}</Text>
+                  </View>
                 </View>
+
+                {selectedEvent?.isMine ? (
+                  <View
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 999,
+                      backgroundColor: "#DCFCE7",
+                    }}
+                  >
+                    <Text style={{ color: "#15803D", fontWeight: "bold" }}>
+                      내 일정
+                    </Text>
+                  </View>
+                ) : null}
               </View>
 
-              {selectedEvent?.isMine ? (
-                <View
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    borderRadius: 999,
-                    backgroundColor: "#DCFCE7",
-                  }}
-                >
-                  <Text style={{ color: "#15803D", fontWeight: "bold" }}>
-                    내 일정
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-
-            <View
-              style={{
-                backgroundColor: "white",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                borderRadius: 14,
-                padding: 12,
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ color: "#64748B", marginBottom: 6 }}>이름</Text>
-              <Text style={{ fontSize: 16 }}>{displayName}</Text>
-            </View>
-            <View
-              style={{
-                backgroundColor: "white",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                borderRadius: 14,
-                padding: 12,
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ color: "#64748B", marginBottom: 6 }}>종류</Text>
-              <Text style={{ fontSize: 15 }}>{leaveType}</Text>
-            </View>
-            <View
-              style={{
-                backgroundColor: "white",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                borderRadius: 14,
-                padding: 12,
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ color: "#64748B", marginBottom: 6 }}>기간</Text>
-              <Text style={{ fontSize: 15 }}>{timeLabel}</Text>
-            </View>
-
-            {!detail?.isHoliday && (
               <View
                 style={{
                   backgroundColor: "white",
@@ -1113,31 +1278,73 @@ export default function Schedule() {
                   borderColor: "#E2E8F0",
                   borderRadius: 14,
                   padding: 12,
-                  marginBottom: 16,
+                  marginBottom: 12,
                 }}
               >
-                <Text style={{ color: "#64748B", marginBottom: 6 }}>사유</Text>
-                <Text style={{ fontSize: 15, color: "#0F172A" }}>
-                  {detail?.reason ?? "-"}
-                </Text>
+                <Text style={{ color: "#64748B", marginBottom: 6 }}>이름</Text>
+                <Text style={{ fontSize: 16 }}>{displayName}</Text>
               </View>
-            )}
+              <View
+                style={{
+                  backgroundColor: "white",
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                  borderRadius: 14,
+                  padding: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <Text style={{ color: "#64748B", marginBottom: 6 }}>종류</Text>
+                <Text style={{ fontSize: 15 }}>{leaveType}</Text>
+              </View>
+              <View
+                style={{
+                  backgroundColor: "white",
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                  borderRadius: 14,
+                  padding: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <Text style={{ color: "#64748B", marginBottom: 6 }}>기간</Text>
+                <Text style={{ fontSize: 15 }}>{timeLabel}</Text>
+              </View>
 
-            <TouchableOpacity
-              onPress={closeEventModal}
-              style={{
-                alignSelf: "flex-end",
-                paddingVertical: 10,
-                paddingHorizontal: 18,
-                borderRadius: 999,
-                backgroundColor: "#121D6D",
-              }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold" }}>닫기</Text>
+              {!detail?.isHoliday && (
+                <View
+                  style={{
+                    backgroundColor: "white",
+                    borderWidth: 1,
+                    borderColor: "#E2E8F0",
+                    borderRadius: 14,
+                    padding: 12,
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text style={{ color: "#64748B", marginBottom: 6 }}>사유</Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                    {detail?.reason ?? "-"}
+                  </Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                onPress={closeEventModal}
+                style={{
+                  alignSelf: "flex-end",
+                  paddingVertical: 10,
+                  paddingHorizontal: 18,
+                  borderRadius: 999,
+                  backgroundColor: "#121D6D",
+                }}
+              >
+                <Text style={{ color: "white", fontWeight: "bold" }}>닫기</Text>
+              </TouchableOpacity>
             </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        </Modal>
+      )}
       <Modal
         visible={dayEventsModalOpen}
         transparent

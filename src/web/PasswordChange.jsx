@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import api from "../api/api";
@@ -9,6 +9,19 @@ export default function PasswordChange() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const showSuccessAlert = (message) => {
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      window.alert(message);
+      return;
+    }
+    Alert.alert("완료", message);
+  };
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.title = "비밀번호 변경";
+    }
+  }, []);
 
   const handleChange = async () => {
     if (!oldPassword || !newPassword || !confirmNewPassword) {
@@ -33,7 +46,7 @@ export default function PasswordChange() {
       });
 
       console.log("비밀번호 변경 성공:", response.data);
-      Alert.alert("완료", "비밀번호가 변경되었습니다.");
+      showSuccessAlert("비밀번호가 변경되었습니다.");
       navigation.goBack();
     } catch (error) {
       Alert.alert(
@@ -44,16 +57,19 @@ export default function PasswordChange() {
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
       <View
         style={{
-          width: "40%",
-          height: "50%",
+          width: "100%",
+          maxWidth: 600,
+          maxHeight: "90%",
           justifyContent: "center",
           alignItems: "center",
           padding: 40,
+          paddingHorizontal: 70,
           borderRadius: 12,
           backgroundColor: "white",
+          overflow: "hidden",
         }}
       >
         <View style={{ width: "100%" }}>

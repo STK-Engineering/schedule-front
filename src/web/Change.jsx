@@ -19,6 +19,14 @@ export default function Change() {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  const showSuccessAlert = (message) => {
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      window.alert(message);
+      return;
+    }
+    Alert.alert("완료", message);
+  };
+
   const handleSendEmail = async () => {
     if (!email) {
       Alert.alert("알림", "이메일을 입력해주세요");
@@ -32,6 +40,7 @@ export default function Change() {
 
       navigation.navigate("Change");
       console.log("재설정 인증코드 발송 성공:", response.data);
+      showSuccessAlert("인증코드가 발송되었습니다.");
     } catch (error) {
       console.log(error);
       Alert.alert(
@@ -61,6 +70,7 @@ export default function Change() {
       });
 
       console.log("비밀번호 재설정 성공:", response.data);
+      showSuccessAlert("비밀번호가 재설정되었습니다.");
       navigation.navigate("Login");
     } catch (error) {
       Alert.alert(

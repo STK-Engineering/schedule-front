@@ -17,6 +17,14 @@ export default function SignUp() {
   const [authCode, setAuthCode] = useState("");
   const [password, setPassword] = useState("");
 
+  const showSuccessAlert = (message) => {
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      window.alert(message);
+      return;
+    }
+    Alert.alert("완료", message);
+  };
+
   const handleSignUp = async () => {
     if (!email || !authCode || !password) {
       Alert.alert("알림", "이메일과 인증번호, 비밀번호를 입력해주세요");
@@ -32,6 +40,7 @@ export default function SignUp() {
 
       console.log("회원가입 성공:", response.data);
 
+      showSuccessAlert("회원가입이 완료되었습니다.");
       navigation.navigate("Login");
     } catch (error) {
       console.log("error message:", error.message);
@@ -55,6 +64,7 @@ export default function SignUp() {
       });
 
       console.log("인증코드 발송 성공:", response.data);
+      showSuccessAlert("인증코드가 발송되었습니다.");
     } catch (error) {
       console.log(error);
       Alert.alert(

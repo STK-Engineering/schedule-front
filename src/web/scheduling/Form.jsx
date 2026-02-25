@@ -222,6 +222,17 @@ export default function Form() {
     };
   }, []);
 
+  const removeFirstSchedule = () => {
+    if (!showSecondRange) return;
+    setStartDate(startDate2);
+    setEndDate(endDate2);
+    setNote1(note2);
+    setStartDate2("");
+    setEndDate2("");
+    setNote2("");
+    setShowSecondRange(false);
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -473,70 +484,6 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <View style={styles.fieldGroupHeader}>
-              <Text style={styles.fieldGroupTitle}>작업 일정</Text>
-            </View>
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 시작일</Text>
-                <input
-                  type="date"
-                  style={htmlInputStyle}
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </View>
-              <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 종료일</Text>
-                <input
-                  type="date"
-                  style={htmlInputStyle}
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  min={startDate || undefined}
-                />
-              </View>
-            </View>
-            <View style={[styles.fieldRow, styles.fieldRowSpaced]}>
-              <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 작업</Text>
-                <select
-                  style={htmlInputStyle}
-                  value={workType}
-                  onChange={(e) => setWorkType(e.target.value)}
-                >
-                  <option value="">선택하세요</option>
-                  <option value="서비스">서비스</option>
-                  <option value="엔지니어">엔지니어</option>
-                  <option value="커미셔닝">커미셔닝</option>
-                </select>
-              </View>
-              <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 종류</Text>
-                <select
-                  style={htmlInputStyle}
-                  value={systemType}
-                  onChange={(e) => setSystemType(e.target.value)}
-                >
-                  <option value="">선택하세요</option>
-                  <option value="AMS">AMS</option>
-                  <option value="BMS">BMS</option>
-                  <option value="PMS">PMS</option>
-                </select>
-              </View>
-              <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 지역</Text>
-                <TextInput
-                  placeholder="예: 대한민국"
-                  value={region}
-                  onChangeText={setRegion}
-                  style={styles.input}
-                />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.fieldGroup}>
             <View style={styles.fieldItem}>
               <Text style={styles.fieldLabel}>* 엔지니어 성함</Text>
               <View style={styles.engineerSelectWrap}>
@@ -608,6 +555,46 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
+            <Text style={styles.fieldGroupTitle}>* 작업/종류/지역</Text>
+            <View style={[styles.fieldRow, styles.fieldRowSpaced]}>
+              <View style={styles.fieldItem}>
+                <Text style={styles.fieldLabel}>* 작업</Text>
+                <select
+                  style={htmlInputStyle}
+                  value={workType}
+                  onChange={(e) => setWorkType(e.target.value)}
+                >
+                  <option value="">선택하세요</option>
+                  <option value="서비스">서비스</option>
+                  <option value="엔지니어">엔지니어</option>
+                  <option value="커미셔닝">커미셔닝</option>
+                </select>
+              </View>
+              <View style={styles.fieldItem}>
+                <Text style={styles.fieldLabel}>* 종류</Text>
+                <select
+                  style={htmlInputStyle}
+                  value={systemType}
+                  onChange={(e) => setSystemType(e.target.value)}
+                >
+                  <option value="">선택하세요</option>
+                  <option value="AMS">AMS</option>
+                  <option value="BMS">BMS</option>
+                  <option value="PMS">PMS</option>
+                </select>
+              </View>
+              <View style={styles.fieldItem}>
+                <Text style={styles.fieldLabel}>* 지역</Text>
+                <TextInput
+                  placeholder="예: 대한민국"
+                  value={region}
+                  onChangeText={setRegion}
+                  style={styles.input}
+                />
+              </View>
+            </View>
+          </View>
+          <View style={styles.fieldGroup}>
             <Text style={styles.fieldGroupTitle}>* 작업 내용</Text>
             <View style={styles.fieldRow}>
               <View style={[styles.fieldItem, styles.fieldItemFull]}>
@@ -617,6 +604,44 @@ export default function Form() {
                   onChangeText={setJobDescription}
                   style={[styles.input, styles.textArea]}
                   multiline
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.fieldGroup}>
+            <View style={styles.fieldGroupHeader}>
+              <Text style={styles.fieldGroupTitle}>1차 작업 일정</Text>
+              {showSecondRange && (
+                <TouchableOpacity
+                  style={styles.addSecondIconButton}
+                  onPress={removeFirstSchedule}
+                  aria-label="1차 일정 제거"
+                >
+                  <Text style={styles.addSecondIconText}>- 제거</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldItem}>
+                <Text style={styles.fieldLabel}>* 시작일</Text>
+                <input
+                  type="date"
+                  style={htmlInputStyle}
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </View>
+              <View style={styles.fieldItem}>
+                <Text style={styles.fieldLabel}>* 종료일</Text>
+                <input
+                  type="date"
+                  style={htmlInputStyle}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate || undefined}
                 />
               </View>
             </View>

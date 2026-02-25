@@ -10,9 +10,13 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Image,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import Checkbox from "expo-checkbox";
 import api from "../../api/api";
+import PageLayout from "../../components/PageLayout";
+import showIcon from "../../../assets/icon/show.png";
 
 const columns = [
   { key: "name", title: "이름", width: "10%", sortable: true },
@@ -20,7 +24,8 @@ const columns = [
   { key: "type", title: "유형", width: "10%", sortable: true },
   { key: "date", title: "사용일자", width: "20%", sortable: true },
   { key: "reason", title: "사유", width: "15%", sortable: true },
-  { key: "etc", title: "기타사항", width: "23%", sortable: true },
+  { key: "etc", title: "기타사항", width: "15%", sortable: true },
+  { key: "action", title: "보기", width: "8%", sortable: false },
 ];
 
 function formatPeriod(startDate, endDate) {
@@ -38,6 +43,7 @@ function toLeaveCategory(type) {
 }
 
 export default function Application() {
+  const navigation = useNavigation();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,6 +74,18 @@ export default function Application() {
           date: formatPeriod(e.startDate, e.endDate),
           reason: e.reason ?? "-",
           etc: e.etc ?? "-",
+          detail: {
+            name: e.employee?.name ?? "",
+            department: e.employee?.department?.name ?? "",
+            type: e.leaveType ?? "",
+            startDate: e.startDate ?? "",
+            endDate: e.endDate ?? "",
+            usedDay: e.usedDay ?? 0,
+            reason: e.reason ?? "",
+            etc: e.etc ?? "",
+            status: e.approvalStatusDisplay ?? e.approvalStatus ?? "",
+            rejectionReason: e.rejectionReason ?? "—",
+          },
         }));
 
         setData(mapped);
@@ -193,7 +211,6 @@ export default function Application() {
           </Text>
         </TouchableOpacity>
       ))}
-      <View style={styles.moreHeaderCell} />
     </View>
   );
 
@@ -220,20 +237,48 @@ export default function Application() {
             color="#121D6D"
           />
         </View>
-        {columns.map((col) => (
-          <View key={col.key} style={[styles.cell, { width: col.width }]}>
-            <Text style={styles.cellText} numberOfLines={1}>
-              {item[col.key]}
-            </Text>
-          </View>
-        ))}
+        {columns.map((col) => {
+          if (col.key === "action") {
+            return (
+              <View key={col.key} style={[styles.cell, { width: col.width }]}>
+                <TouchableOpacity
+                  style={styles.detailButton}
+                  onPress={() =>
+                    navigation.navigate("LeaveStatusContent", item.detail ?? {})
+                  }
+                >
+                  <Text style={styles.detailButtonText}>보기</Text>
+                  <Image source={showIcon} style={styles.detailButtonIcon} />
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          return (
+            <View key={col.key} style={[styles.cell, { width: col.width }]}>
+              <Text style={styles.cellText} numberOfLines={1}>
+                {item[col.key]}
+              </Text>
+            </View>
+          );
+        })}
 
       </View>
     );
   };
 
+  const breadcrumb = [
+    { label: "홈", route: "Home" },
+    { label: "휴가 신청", route: "LeaveForm" },
+    { label: "승인된 휴가" },
+  ];
+
   return (
-    <View style={styles.page}>
+    <PageLayout
+      breadcrumb={breadcrumb}
+      scroll={false}
+      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+    >
+      <View style={styles.page}>
       <View style={styles.filterCard}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>휴가 신청 목록</Text>
@@ -330,7 +375,8 @@ export default function Application() {
           </ScrollView>
         )}
       </View>
-    </View>
+      </View>
+    </PageLayout>
   );
 }
 
@@ -349,7 +395,6 @@ function FilterCheckbox({ label, checked, onChange }) {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 20,
     backgroundColor: "#F3F4F6",
     flex: 1,
     gap: 16,
@@ -481,5 +526,18 @@ const styles = StyleSheet.create({
   headerText: { fontWeight: "600" },
   sortIcon: { color: "#64748B", fontWeight: "600" },
   cellText: { color: "#333" },
+  detailButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    justifyContent: "space-between",
+  },
+  detailButtonText: { fontSize: 12, color: "#0F172A" },
+  detailButtonIcon: { width: 14, height: 14, resizeMode: "contain" },
 
 });

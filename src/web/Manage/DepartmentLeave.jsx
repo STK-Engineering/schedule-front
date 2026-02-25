@@ -11,14 +11,15 @@ import {
 } from "react-native";
 import Checkbox from "expo-checkbox";
 import api from "../../api/api";
+import PageLayout from "../../components/PageLayout";
 
 const columns = [
-  { key: "name", title: "이름", width: 200, sortable: true },
-  { key: "level", title: "직급", width: 200, sortable: true },
-  { key: "totalDays", title: "총 연차", width: 200, sortable: true },
-  { key: "usedDays", title: "사용 연차", width: 200, sortable: true },
-  { key: "remainingDays", title: "잔여 연차", width: 200, sortable: true },
-  { key: "hireDate", title: "입사일", width: 140, sortable: true },
+  { key: "name", title: "이름", width: "10%", sortable: true },
+  { key: "level", title: "직급", width: "10%", sortable: true },
+  { key: "totalDays", title: "총 연차", width: "10%", sortable: true },
+  { key: "usedDays", title: "사용 연차", width: "10%", sortable: true },
+  { key: "remainingDays", title: "잔여 연차", width: "10%", sortable: true },
+  { key: "hireDate", title: "입사일", width: "10%", sortable: true },
 ];
 
 function formatDays(value) {
@@ -173,8 +174,19 @@ export default function DepartmentLeave() {
     );
   };
 
+  const breadcrumb = [
+    { label: "홈", route: "Home" },
+    { label: "어드민", route: "Setting" },
+    { label: "연차 현황 관리" },
+  ];
+
   return (
-    <View style={styles.page}>
+    <PageLayout
+      breadcrumb={breadcrumb}
+      scroll={false}
+      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+    >
+      <View style={styles.page}>
       <View style={styles.filterCard}>
         <View style={styles.titleRow}>
           <View>
@@ -343,13 +355,13 @@ export default function DepartmentLeave() {
           </ScrollView>
         )}
       </View>
-    </View>
+      </View>
+    </PageLayout>
   );
 }
 
 const styles = StyleSheet.create({
   page: {
-    padding: 20,
     backgroundColor: "#F3F4F6",
     flex: 1,
     gap: 16,

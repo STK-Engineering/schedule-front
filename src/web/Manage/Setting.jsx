@@ -13,24 +13,25 @@ import {
 } from "react-native";
 import Checkbox from "expo-checkbox";
 import api from "../../api/api";
+import PageLayout from "../../components/PageLayout";
 
 const columns = [
-  { key: "employeeId", title: "사번", width: 120, sortable: true },
-  { key: "name", title: "이름", width: 90, sortable: true },
-  { key: "department", title: "부서", width: 155, sortable: true },
+  { key: "employeeId", title: "사번", width: "8%", sortable: true },
+  { key: "name", title: "이름", width: "6%", sortable: true },
+  { key: "department", title: "부서", width: "10%", sortable: true },
   {
     key: "engineeringPart",
     title: "ENGINEERING 구분",
-    width: 160,
+    width: "11%",
     sortable: true,
   },
-  { key: "position", title: "직급", width: 90, sortable: true },
-  { key: "date", title: "입사일", width: 140, sortable: true },
-  { key: "location", title: "근무지", width: 83, sortable: true },
-  { key: "mail", title: "메일", width: 203, sortable: true },
-  { key: "role", title: "권한", width: 150, sortable: true },
-  { key: "status", title: "상태", width: 160, sortable: true },
-  { key: "actions", title: "", width: 56, sortable: false },
+  { key: "position", title: "직급", width: "4%", sortable: true },
+  { key: "date", title: "입사일", width: "8%", sortable: true },
+  { key: "location", title: "근무지", width: "5%", sortable: true },
+  { key: "mail", title: "메일", width: "13%", sortable: true },
+  { key: "role", title: "권한", width: "13%", sortable: true },
+  { key: "status", title: "상태", width: "10%", sortable: true },
+  { key: "actions", title: "", width: "5%", sortable: false },
 ];
 
 const BASE_ROLE = "일반";
@@ -47,6 +48,10 @@ const ROLE_TO_API_MAP = {
 const SCHEDULE_ROLE_MAP = {
   SCHEDULE_GENERAL: "일반",
   SCHEDULE_ADMIN: "관리자",
+};
+const SCHEDULE_ROLE_DISPLAY_MAP = {
+  SCHEDULE_GENERAL: "일정-일반",
+  SCHEDULE_ADMIN: "일정-관리자",
 };
 const SCHEDULE_ROLE_TO_API_MAP = {
   일반: "SCHEDULE_GENERAL",
@@ -160,8 +165,10 @@ function normalizeRoles(value) {
         return [v.name, v.role, v.authorityName].filter(Boolean);
       })
       .map((v) => String(v).trim())
-      .filter((v) => !SCHEDULE_ROLE_MAP[String(v).toUpperCase()])
-      .map((v) => ROLE_MAP[v.toUpperCase()] ?? v);
+      .map((v) => {
+        const key = String(v).toUpperCase();
+        return SCHEDULE_ROLE_DISPLAY_MAP[key] ?? ROLE_MAP[key] ?? v;
+      });
     return Array.from(new Set([BASE_ROLE, ...cleaned]));
   }
   if (typeof value === "string") {
@@ -169,8 +176,10 @@ function normalizeRoles(value) {
       .split(",")
       .map((v) => v.trim())
       .filter(Boolean)
-      .filter((v) => !SCHEDULE_ROLE_MAP[String(v).toUpperCase()])
-      .map((v) => ROLE_MAP[v.toUpperCase()] ?? v);
+      .map((v) => {
+        const key = String(v).toUpperCase();
+        return SCHEDULE_ROLE_DISPLAY_MAP[key] ?? ROLE_MAP[key] ?? v;
+      });
     return Array.from(new Set([BASE_ROLE, ...parts]));
   }
   return [BASE_ROLE];
@@ -694,8 +703,19 @@ export default function Setting() {
     Math.max(320, windowHeight - 360),
   );
 
+  const breadcrumb = [
+    { label: "홈", route: "Home" },
+    { label: "어드민", route: "Setting" },
+    { label: "사용자 관리" },
+  ];
+
   return (
-    <View style={styles.page}>
+    <PageLayout
+      breadcrumb={breadcrumb}
+      scroll={false}
+      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+    >
+      <View style={styles.page}>
       <View style={styles.filterCard}>
         <View style={styles.titleRow}>
           <View>
@@ -710,16 +730,17 @@ export default function Setting() {
           </View>
         </View>
 
-        {!!error && <Text style={{ color: "red", marginTop: 6 }}>{error}</Text>}
+        {!!error && <Text style={{ color: "red" }}>{error}</Text>}
 
         <View style={styles.filterRow}>
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>부서</Text>
+          <View style={[styles.filterGroup, styles.filterGroupOffset]}>
+            <Text style={styles.filterLabel}>부서 필터</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.checkboxRow}>
                 <TouchableOpacity
                   style={[
                     styles.checkboxItem,
+                    styles.checkboxItemChip,
                     filterDepartments.length === 0 && styles.checkboxItemActive,
                   ]}
                   onPress={() => setFilterDepartments([])}
@@ -736,6 +757,7 @@ export default function Setting() {
                     key={String(dept.value)}
                     style={[
                       styles.checkboxItem,
+                      styles.checkboxItemChip,
                       filterDepartments.includes(dept.value) &&
                         styles.checkboxItemActive,
                     ]}
@@ -1018,7 +1040,7 @@ export default function Setting() {
               </View>
             </View>
 
-            <View style={styles.roleGroup}>
+            {/* <View style={styles.roleGroup}>
               <Text style={styles.filterLabel}>일정 권한</Text>
               <View style={styles.checkboxRow}>
                 {SCHEDULE_PERMISSION_OPTIONS.map((opt) => {
@@ -1055,7 +1077,7 @@ export default function Setting() {
                   );
                 })}
               </View>
-            </View>
+            </View> */}
 
             <SelectField
               placeholder="근무지 선택"
@@ -1238,13 +1260,13 @@ export default function Setting() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-    </View>
+      </View>
+    </PageLayout>
   );
 }
 
 const styles = StyleSheet.create({
   page: {
-    padding: 20,
     backgroundColor: "#F3F4F6",
     flex: 1,
     gap: 16,
@@ -1258,7 +1280,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   filterRow: {
-    gap: 12,
+    gap: 8,
   },
   filterRowLine: {
     flexDirection: "row",
@@ -1267,10 +1289,13 @@ const styles = StyleSheet.create({
   filterGroup: {
     flex: 1,
   },
+  filterGroupOffset: {
+    marginTop: 10,
+  },
   filterLabel: {
     fontSize: 12,
     color: "#64748B",
-    marginBottom: 8,
+    marginBottom: 6
   },
   checkboxRow: {
     flexDirection: "row",
@@ -1281,7 +1306,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 10,
+  },
+  checkboxItemChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
   },
   checkboxItemActive: {
     borderColor: "#94A3B8",

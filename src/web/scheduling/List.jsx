@@ -13,6 +13,7 @@ import {
 import api from "../../api/api";
 import showIcon from "../../../assets/icon/show.png";
 import { useNavigation } from "@react-navigation/native";
+import PageLayout from "../../components/PageLayout";
 
 const columns = [
   { key: "jobNumber", title: "작업번호", width: "8%", sortable: true },
@@ -230,8 +231,19 @@ export default function Application() {
     );
   };
 
+  const breadcrumb = [
+    { label: "홈", route: "Home" },
+    { label: "일정 관리", route: "SchedulingList" },
+    { label: "일정 관리 목록" },
+  ];
+
   return (
-    <View style={styles.page}>
+    <PageLayout
+      breadcrumb={breadcrumb}
+      scroll={false}
+      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+    >
+      <View style={styles.page}>
       <View style={styles.filterCard}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>일정 등록 목록</Text>
@@ -321,13 +333,13 @@ export default function Application() {
         )}
       </View>
 
-    </View>
+      </View>
+    </PageLayout>
   );
 }
 
 const styles = StyleSheet.create({
   page: {
-    padding: 20,
     backgroundColor: "#F3F4F6",
     flex: 1,
     gap: 16,

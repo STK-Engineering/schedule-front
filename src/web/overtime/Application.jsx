@@ -9,9 +9,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import Checkbox from "expo-checkbox";
 import api from "../../api/api";
+import PageLayout from "../../components/PageLayout";
+import showIcon from "../../../assets/icon/show.png";
 
 const columns = [
   { key: "name", title: "이름", width: "10%", sortable: true },
@@ -21,6 +25,7 @@ const columns = [
   { key: "requestDate", title: "요청일자", width: "12%", sortable: true },
   { key: "timeRange", title: "작업시간", width: "12%", sortable: true },
   { key: "jobDescription", title: "작업내용", width: "16%", sortable: true },
+  { key: "action", title: "보기", width: "8%", sortable: false },
 ];
 
 function trimSeconds(value) {
@@ -40,6 +45,7 @@ function formatTimeRange(startTime, endTime) {
 }
 
 export default function Application() {
+  const navigation = useNavigation();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,6 +76,20 @@ export default function Application() {
           timeRange: formatTimeRange(e.startTime, e.endTime),
           jobDescription: e.jobDescription ?? "-",
           status: e.approvalStatusDisplay ?? e.approvalStatus ?? "-",
+          detail: {
+            name: e.employee?.name ?? "",
+            department: e.employee?.department?.name ?? "",
+            jobNumber: e.jobNumber ?? "",
+            vesselName: e.vesselName ?? "",
+            hullNo: e.hullNo ?? "",
+            requestDate: e.requestDate ?? "",
+            startTime: e.startTime ?? "",
+            endTime: e.endTime ?? "",
+            jobDescription: e.jobDescription ?? "",
+            imageUrl: e.imageUrl ?? "",
+            status: e.approvalStatusDisplay ?? e.approvalStatus ?? "",
+            rejectionReason: e.rejectionReason ?? "—",
+          },
         }));
 
         setData(mapped);
@@ -195,7 +215,6 @@ export default function Application() {
           </Text>
         </TouchableOpacity>
       ))}
-      <View style={styles.moreHeaderCell} />
     </View>
   );
 
@@ -219,20 +238,51 @@ export default function Application() {
             color="#121D6D"
           />
         </View>
-        {columns.map((col) => (
-          <View key={col.key} style={[styles.cell, { width: col.width }]}>
-            <Text style={styles.cellText} numberOfLines={1}>
-              {item[col.key]}
-            </Text>
-          </View>
-        ))}
+        {columns.map((col) => {
+          if (col.key === "action") {
+            return (
+              <View key={col.key} style={[styles.cell, { width: col.width }]}>
+                <TouchableOpacity
+                  style={styles.detailButton}
+                  onPress={() =>
+                    navigation.navigate(
+                      "OverTimeStatusContent",
+                      item.detail ?? {}
+                    )
+                  }
+                >
+                  <Text style={styles.detailButtonText}>보기</Text>
+                  <Image source={showIcon} style={styles.detailButtonIcon} />
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          return (
+            <View key={col.key} style={[styles.cell, { width: col.width }]}>
+              <Text style={styles.cellText} numberOfLines={1}>
+                {item[col.key]}
+              </Text>
+            </View>
+          );
+        })}
 
       </View>
     );
   };
 
+  const breadcrumb = [
+    { label: "홈", route: "Home" },
+    { label: "연장 근로 신청", route: "OverTimeForm" },
+    { label: "승인된 연장 근로" },
+  ];
+
   return (
-    <View style={styles.page}>
+    <PageLayout
+      breadcrumb={breadcrumb}
+      scroll={false}
+      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+    >
+      <View style={styles.page}>
       <View style={styles.filterCard}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>연장 근로 신청 목록</Text>
@@ -304,7 +354,8 @@ export default function Application() {
           </ScrollView>
         )}
       </View>
-    </View>
+      </View>
+    </PageLayout>
   );
 }
 
@@ -323,7 +374,6 @@ function FilterCheckbox({ label, checked, onChange }) {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 20,
     backgroundColor: "#F3F4F6",
     flex: 1,
     gap: 16,
@@ -348,6 +398,7 @@ const styles = StyleSheet.create({
     gap: 16,
     alignItems: "flex-end",
     flexWrap: "wrap",
+    justifyContent: "flex-end",
   },
   downloadBtn: {
     paddingVertical: 8,
@@ -455,5 +506,18 @@ const styles = StyleSheet.create({
   headerText: { fontWeight: "600" },
   sortIcon: { color: "#64748B", fontWeight: "600" },
   cellText: { color: "#333" },
+  detailButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    justifyContent: "space-between",
+  },
+  detailButtonText: { fontSize: 12, color: "#0F172A" },
+  detailButtonIcon: { width: 14, height: 14, resizeMode: "contain" },
 
 });

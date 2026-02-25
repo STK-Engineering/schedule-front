@@ -14,13 +14,14 @@ import {
 import api from "../../../api/api";
 import showIcon from "../../../../assets/icon/show.png";
 import { useNavigation, useFocusEffect, useRoute } from "@react-navigation/native";
+import PageLayout from "../../../components/PageLayout";
 
 const columns = [
-  { key: "department", title: "부서", width: 200 },
-  { key: "engineeringPart", title: "ENGINEERING 구분", width: 200 },
-  { key: "steps", title: "결재 단계", width: 200 },
-  { key: "employees", title: "대상 인원", width: 700 },
-  { key: "action", title: "", width: 100 },
+  { key: "department", title: "부서", width: "10%" },
+  { key: "engineeringPart", title: "ENGINEERING 구분", width: "11%" },
+  { key: "steps", title: "결재 단계", width: "10%" },
+  { key: "employees", title: "대상 인원", width: "20%" },
+  { key: "action", title: "", width: "8%" },
 ];
 const TABLE_WIDTH = columns.reduce((sum, col) => sum + col.width, 0);
 
@@ -391,8 +392,19 @@ export default function ApprovalLine() {
       }));
   }, [employees]);
 
+  const breadcrumb = [
+    { label: "홈", route: "Home" },
+    { label: "어드민", route: "Setting" },
+    { label: "결재 라인 관리" },
+  ];
+
   return (
-    <View style={styles.page}>
+    <PageLayout
+      breadcrumb={breadcrumb}
+      scroll={false}
+      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+    >
+      <View style={styles.page}>
       <View style={styles.headerCard}>
         <Text style={styles.pageTitle}>결재 라인 관리</Text>
         <Text style={styles.pageSub}>
@@ -817,15 +829,15 @@ export default function ApprovalLine() {
           ) : null}
         </TouchableOpacity>
       </Modal>
-    </View>
+      </View>
+    </PageLayout>
   );
 }
 
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F3F4F6",
   },
   headerCard: {
     backgroundColor: "#FFFFFF",

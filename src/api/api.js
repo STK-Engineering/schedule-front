@@ -3,7 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
 
 const isWeb = typeof window !== "undefined";
-const BASE_URL = "https://schedule.stkkr.com/";
+// const BASE_URL = "https://schedule.stkkr.com/";
+const BASE_URL = "http://localhost:8080/";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -190,10 +191,13 @@ api.interceptors.response.use(
     const errorCode = response?.data?.code;
     const status = response?.status;
     const msg = response?.data?.msg;
+    const fallbackMsg =
+      "서버 오류가 발생했습니다. IT/ISO 부서로 문의해주시길 바랍니다.";
+    const allowFallback = errorCode !== "_TOKEN_MISSING";
 
     if (status === 401 && errorCode === "REFRESH_TOKEN_EXPIRED") {
       await forceLogout();
-      showErrorAlert(msg);
+      showErrorAlert(msg || (allowFallback ? fallbackMsg : null));
       return Promise.reject(error);
     }
 
@@ -214,12 +218,12 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        showErrorAlert(msg);
+        showErrorAlert(msg || (allowFallback ? fallbackMsg : null));
         return Promise.reject(refreshError);
       }
     }
 
-    showErrorAlert(msg);
+    showErrorAlert(msg || (allowFallback ? fallbackMsg : null));
     return Promise.reject(error);
   }
 );

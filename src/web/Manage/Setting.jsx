@@ -47,15 +47,23 @@ const ROLE_TO_API_MAP = {
 };
 const SCHEDULE_ROLE_MAP = {
   SCHEDULE_GENERAL: "일반",
+  "SCHEDULE-GENERAL": "일반",
   SCHEDULE_ADMIN: "관리자",
+  "SCHEDULE-ADMIN": "관리자",
 };
 const SCHEDULE_ROLE_DISPLAY_MAP = {
   SCHEDULE_GENERAL: "일정-일반",
+  "SCHEDULE-GENERAL": "일정-일반",
   SCHEDULE_ADMIN: "일정-관리자",
+  "SCHEDULE-ADMIN": "일정-관리자",
+};
+const SCHEDULE_ROLE_DISPLAY_TO_API_MAP = {
+  "일정-일반": "SCHEDULE-GENERAL",
+  "일정-관리자": "SCHEDULE-ADMIN",
 };
 const SCHEDULE_ROLE_TO_API_MAP = {
-  일반: "SCHEDULE_GENERAL",
-  관리자: "SCHEDULE_ADMIN",
+  일반: "SCHEDULE-GENERAL",
+  관리자: "SCHEDULE-ADMIN",
 };
 const ENGINEERING_DEPT_ID = 3;
 const ENGINEERING_SUB_DEPTS = [
@@ -387,7 +395,13 @@ export default function Setting() {
   const buildPayload = () => {
     const normalizedRoles = ensureGeneral(roles);
     const baseApiRoles = normalizedRoles
-      .map((v) => ROLE_TO_API_MAP[v] ?? String(v).trim().toUpperCase())
+      .map(
+        (v) =>
+          ROLE_TO_API_MAP[v] ??
+          SCHEDULE_ROLE_DISPLAY_TO_API_MAP[v] ??
+          SCHEDULE_ROLE_TO_API_MAP[v] ??
+          String(v).trim().toUpperCase(),
+      )
       .filter(Boolean);
     const scheduleApiRoles = schedulePermissions
       .map((v) => SCHEDULE_ROLE_TO_API_MAP[v] ?? null)
@@ -1040,7 +1054,7 @@ export default function Setting() {
               </View>
             </View>
 
-            {/* <View style={styles.roleGroup}>
+            <View style={styles.roleGroup}>
               <Text style={styles.filterLabel}>일정 권한</Text>
               <View style={styles.checkboxRow}>
                 {SCHEDULE_PERMISSION_OPTIONS.map((opt) => {
@@ -1077,7 +1091,7 @@ export default function Setting() {
                   );
                 })}
               </View>
-            </View> */}
+            </View>
 
             <SelectField
               placeholder="근무지 선택"

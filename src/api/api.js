@@ -191,13 +191,15 @@ api.interceptors.response.use(
     const errorCode = response?.data?.code;
     const status = response?.status;
     const msg = response?.data?.message;
+    const getErrorMessage = (err, fallback) =>
+      err?.response?.data?.message || fallback;
     const fallbackMsg =
       "서버 오류가 발생했습니다. IT/ISO 부서로 문의해주시길 바랍니다.";
     const allowFallback = status >= 500;
 
     if (status === 401 && errorCode === "REFRESH_TOKEN_EXPIRED") {
       await forceLogout();
-      showErrorAlert("로그인이 필요합니다.");
+      showErrorAlert(msg || "로그인이 필요합니다.");
       return Promise.reject(error);
     }
 
@@ -218,13 +220,13 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        showErrorAlert("로그인이 필요합니다.");
+        showErrorAlert(getErrorMessage(refreshError, "로그인이 필요합니다."));
         return Promise.reject(refreshError);
       }
     }
 
     if (status === 401) {
-      showErrorAlert("로그인이 필요합니다.");
+      showErrorAlert(msg || "로그인이 필요합니다.");
       return Promise.reject(error);
     }
 

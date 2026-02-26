@@ -1141,7 +1141,7 @@ export default function Schedule() {
               <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
                 이름
               </Text>
-              <Text style={{ fontSize: 16, color: "#0F172A" }}>
+              <Text style={{ fontSize: 15, color: "#0F172A" }}>
                 {displayName}
               </Text>
             </View>
@@ -1149,7 +1149,7 @@ export default function Schedule() {
               <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
                 종류
               </Text>
-              <Text style={{ fontSize: 16, color: "#0F172A" }}>
+              <Text style={{ fontSize: 15, color: "#0F172A" }}>
                 {leaveType}
               </Text>
             </View>
@@ -1157,7 +1157,7 @@ export default function Schedule() {
               <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
                 기간
               </Text>
-              <Text style={{ fontSize: 16, color: "#0F172A" }}>
+              <Text style={{ fontSize: 15, color: "#0F172A" }}>
                 {timeLabel}
               </Text>
             </View>
@@ -1166,7 +1166,7 @@ export default function Schedule() {
                 <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
                   사유
                 </Text>
-                <Text style={{ fontSize: 16, color: "#0F172A" }}>
+                <Text style={{ fontSize: 15, color: "#0F172A" }}>
                   {detail?.reason ?? "-"}
                 </Text>
               </View>

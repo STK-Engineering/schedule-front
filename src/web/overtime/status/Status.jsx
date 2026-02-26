@@ -176,8 +176,36 @@ function Item({ item, onDeleted }) {
 
   const statusTheme = STATUS_STYLE[item.status] || STATUS_STYLE["대기"];
 
+  const hidePdf = item.status !== "승인";
   const hideEdit = item.type === "경조사" || item.status === "취소";
-  const hideCancel = item.status === "취소";
+  const hideCancel = item.status === "취소" ||item.status === "반려";
+
+  const downloadPdf = async () => {
+    try {
+      const res = await api.get(`/overtime/${item.id}/download`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `OverTime_application_form_${item.name}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.log(
+        "pdf download error:",
+        e?.response?.status,
+        e?.response?.data,
+      );
+      Alert.alert("오류", "PDF 다운로드에 실패했습니다.");
+    }
+  };
 
   const cancelForm = async () => {
     try {
@@ -253,6 +281,18 @@ function Item({ item, onDeleted }) {
               activeOpacity={0.7}
             >
               <Text style={[styles.pdfText, { color: "#DC2626" }]}>취소</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* PDF */}
+          {!hidePdf && (
+            <TouchableOpacity
+              style={styles.pdfBtn}
+              onPress={downloadPdf}
+              activeOpacity={0.7}
+            >
+              <Image source={item.file} style={styles.pdfIcon} />
+              <Text style={styles.pdfText}>PDF</Text>
             </TouchableOpacity>
           )}
         </View>

@@ -75,6 +75,7 @@ export default function Form() {
   const [jobNumber, setJobNumber] = useState("");
   const [customer, setCustomer] = useState("");
   const [vesselName, setVesselName] = useState("");
+  const [imoNumber, setImoNumber] = useState("");
   const [hullNo, setHullNo] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [note1, setNote1] = useState("");
@@ -88,17 +89,28 @@ export default function Form() {
   const [workType, setWorkType] = useState("");
   const [systemType, setSystemType] = useState("");
   const [engineers, setEngineers] = useState([]);
-  const [selectedEngineers, setSelectedEngineers] = useState([]);
-  const [customEngineerNames, setCustomEngineerNames] = useState([]);
-  const [engineerInput, setEngineerInput] = useState("");
+  const [selectedEngineers1, setSelectedEngineers1] = useState([]);
+  const [selectedEngineers2, setSelectedEngineers2] = useState([]);
+  const [customEngineerNames1, setCustomEngineerNames1] = useState([]);
+  const [customEngineerNames2, setCustomEngineerNames2] = useState([]);
+  const [engineerInput1, setEngineerInput1] = useState("");
+  const [engineerInput2, setEngineerInput2] = useState("");
   const [engineerLoading, setEngineerLoading] = useState(false);
-  const [showExternalEngineerInput, setShowExternalEngineerInput] =
+  const [showExternalEngineerInput1, setShowExternalEngineerInput1] =
+    useState(false);
+  const [showExternalEngineerInput2, setShowExternalEngineerInput2] =
     useState(false);
   const [isChecked, setChecked] = useState(false);
   const [attemptedCheck, setAttemptedCheck] = useState(false);
-  const [pendingInternalNames, setPendingInternalNames] = useState([]);
+  const [pendingInternalNames1, setPendingInternalNames1] = useState([]);
+  const [pendingInternalNames2, setPendingInternalNames2] = useState([]);
   const endTimeAlertTimerRef = useRef(null);
   const prefillDoneRef = useRef(false);
+  const [jobSuggestions, setJobSuggestions] = useState([]);
+  const [jobSuggestionLoading, setJobSuggestionLoading] = useState(false);
+  const [showJobSuggestions, setShowJobSuggestions] = useState(false);
+  const suggestionClickRef = useRef(false);
+  const jobSuggestionRequestIdRef = useRef(0);
 
   const hasVesselOrHull =
     vesselName.trim().length > 0 || hullNo.trim().length > 0;
@@ -106,6 +118,11 @@ export default function Form() {
   const requestDates2 = buildDateRange(startDate2, endDate2);
   const hasRequestDate =
     Array.isArray(requestDates1) && requestDates1.length > 0;
+
+  const hasEngineers1 =
+    selectedEngineers1.length > 0 || customEngineerNames1.length > 0;
+  const hasEngineers2 =
+    selectedEngineers2.length > 0 || customEngineerNames2.length > 0;
 
   const isFormValid =
     jobNumber.trim().length > 0 &&
@@ -118,7 +135,92 @@ export default function Form() {
     systemType &&
     note1.trim().length > 0 &&
     (!showSecondRange || note2.trim().length > 0) &&
-    (selectedEngineers.length > 0 || customEngineerNames.length > 0);
+    hasEngineers1 &&
+    (!showSecondRange || hasEngineers2);
+
+  const normalizeKeyword = (value) => String(value ?? "").trim();
+
+  const applyQuotation = (item, { force = false } = {}) => {
+    if (!item) return;
+    const nextJobNumber = item.jobNumber ?? "";
+    const nextCustomer = item.customer ?? "";
+    const nextVesselName = item.vesselName ?? "";
+    const nextImoNumber = item.imoNumber ?? "";
+    const nextHullNo = item.hullNo ?? "";
+    const nextDescription =
+      item.serviceDescription ?? item.jobDescription ?? item.sysName ?? "";
+    const nextWorkType = item.divisionType ?? "";
+    const nextSystemType = item.sysName ?? "";
+
+    if (force || !jobNumber) setJobNumber(nextJobNumber);
+    if (force || !customer) setCustomer(nextCustomer);
+    if (force || !vesselName) setVesselName(nextVesselName);
+    if (force || !imoNumber) setImoNumber(nextImoNumber);
+    if (force || !hullNo) setHullNo(nextHullNo);
+    if (force || !jobDescription) setJobDescription(nextDescription);
+    if (force || !workType) setWorkType(nextWorkType);
+    if (force || !systemType) setSystemType(nextSystemType);
+  };
+
+  const findSuggestionToApply = () => {
+    if (!jobSuggestions.length) return null;
+    const keyword = normalizeKeyword(jobNumber).toLowerCase();
+    if (!keyword) return null;
+    return (
+      jobSuggestions.find(
+        (item) =>
+          String(item?.jobNumber ?? "").toLowerCase() === keyword,
+      ) || jobSuggestions[0]
+    );
+  };
+
+  useEffect(() => {
+    const keyword = normalizeKeyword(jobNumber);
+    if (!keyword) {
+      setJobSuggestions([]);
+      setJobSuggestionLoading(false);
+      return;
+    }
+
+    let mounted = true;
+    const currentRequestId = (jobSuggestionRequestIdRef.current += 1);
+    const handle = setTimeout(async () => {
+      try {
+        setJobSuggestionLoading(true);
+        const res = await api.get("/engineer-schedule/quotation", {
+          params: { keyword, page: 0, size: 50 },
+        });
+        if (!mounted || currentRequestId !== jobSuggestionRequestIdRef.current) {
+          return;
+        }
+        const list = Array.isArray(res.data?.content) ? res.data.content : [];
+        setJobSuggestions(list);
+
+        const exact = list.find(
+          (item) =>
+            String(item?.jobNumber ?? "").toLowerCase() ===
+            keyword.toLowerCase(),
+        );
+        if (exact) {
+          applyQuotation(exact, { force: false });
+        }
+      } catch (e) {
+        if (!mounted || currentRequestId !== jobSuggestionRequestIdRef.current) {
+          return;
+        }
+        setJobSuggestions([]);
+      } finally {
+        if (mounted && currentRequestId === jobSuggestionRequestIdRef.current) {
+          setJobSuggestionLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      mounted = false;
+      clearTimeout(handle);
+    };
+  }, [jobNumber]);
 
   useEffect(() => {
     if (!isFormValid && isChecked) {
@@ -138,12 +240,17 @@ export default function Form() {
     setJobNumber(source.jobNumber ?? "");
     setCustomer(source.customer ?? "");
     setVesselName(source.vesselName ?? "");
+    setImoNumber(source.imoNumber ?? "");
     setHullNo(source.hullNo ?? "");
-    setJobDescription(source.jobDescription ?? "");
+    setJobDescription(
+      source.serviceDescription ?? source.jobDescription ?? source.sysName ?? "",
+    );
     setRegion(source.region ?? "");
     const description = String(source.description ?? "").trim();
-    setWorkType(DESCRIPTION_WORK_TYPE_MAP[description] ?? description);
-    setSystemType(source.systemType ?? "");
+    setWorkType(
+      source.divisionType ?? DESCRIPTION_WORK_TYPE_MAP[description] ?? description,
+    );
+    setSystemType(source.sysName ?? source.systemType ?? "");
 
     const schedules = Array.isArray(source.jobScheduleList)
       ? source.jobScheduleList
@@ -167,32 +274,53 @@ export default function Form() {
       setNote2("");
     }
 
-    const engineerList = Array.isArray(firstSchedule.jobScheduleEngineerList)
+    const engineerList1 = Array.isArray(firstSchedule.jobScheduleEngineerList)
       ? firstSchedule.jobScheduleEngineerList
       : [];
-    const internalNames = engineerList
+    const internalNames1 = engineerList1
       .filter((engineer) => engineer.engineerType === "INTERNAL")
       .map((engineer) => engineer.engineerName)
       .filter(Boolean);
-    const externalNames = engineerList
+    const externalNames1 = engineerList1
       .filter((engineer) => engineer.engineerType === "EXTERNAL")
       .map((engineer) => engineer.externalName ?? engineer.engineerName)
       .filter(Boolean);
 
-    setSelectedEngineers([]);
-    setCustomEngineerNames(externalNames);
-    setPendingInternalNames(internalNames);
+    setSelectedEngineers1([]);
+    setCustomEngineerNames1(externalNames1);
+    setPendingInternalNames1(internalNames1);
+
+    if (secondSchedule) {
+      const engineerList2 = Array.isArray(secondSchedule.jobScheduleEngineerList)
+        ? secondSchedule.jobScheduleEngineerList
+        : [];
+      const internalNames2 = engineerList2
+        .filter((engineer) => engineer.engineerType === "INTERNAL")
+        .map((engineer) => engineer.engineerName)
+        .filter(Boolean);
+      const externalNames2 = engineerList2
+        .filter((engineer) => engineer.engineerType === "EXTERNAL")
+        .map((engineer) => engineer.externalName ?? engineer.engineerName)
+        .filter(Boolean);
+      setSelectedEngineers2([]);
+      setCustomEngineerNames2(externalNames2);
+      setPendingInternalNames2(internalNames2);
+    } else {
+      setSelectedEngineers2([]);
+      setCustomEngineerNames2([]);
+      setPendingInternalNames2([]);
+    }
 
     prefillDoneRef.current = true;
   }, [isEdit, source]);
 
   useEffect(() => {
-    if (!pendingInternalNames.length || engineers.length === 0) return;
+    if (!pendingInternalNames1.length || engineers.length === 0) return;
 
     const matched = [];
     const unmatched = [];
 
-    pendingInternalNames.forEach((name) => {
+    pendingInternalNames1.forEach((name) => {
       const found = engineers.find(
         (engineer) => normalizeName(engineer.name) === normalizeName(name),
       );
@@ -204,15 +332,43 @@ export default function Form() {
     });
 
     if (matched.length > 0) {
-      setSelectedEngineers(matched);
+      setSelectedEngineers1(matched);
     }
     if (unmatched.length > 0) {
-      setCustomEngineerNames((prev) =>
+      setCustomEngineerNames1((prev) =>
         Array.from(new Set([...prev, ...unmatched])),
       );
     }
-    setPendingInternalNames([]);
-  }, [pendingInternalNames, engineers]);
+    setPendingInternalNames1([]);
+  }, [pendingInternalNames1, engineers]);
+
+  useEffect(() => {
+    if (!pendingInternalNames2.length || engineers.length === 0) return;
+
+    const matched = [];
+    const unmatched = [];
+
+    pendingInternalNames2.forEach((name) => {
+      const found = engineers.find(
+        (engineer) => normalizeName(engineer.name) === normalizeName(name),
+      );
+      if (found) {
+        matched.push(found);
+      } else {
+        unmatched.push(name);
+      }
+    });
+
+    if (matched.length > 0) {
+      setSelectedEngineers2(matched);
+    }
+    if (unmatched.length > 0) {
+      setCustomEngineerNames2((prev) =>
+        Array.from(new Set([...prev, ...unmatched])),
+      );
+    }
+    setPendingInternalNames2([]);
+  }, [pendingInternalNames2, engineers]);
 
   useEffect(() => {
     return () => {
@@ -227,10 +383,17 @@ export default function Form() {
     setStartDate(startDate2);
     setEndDate(endDate2);
     setNote1(note2);
+    setSelectedEngineers1(selectedEngineers2);
+    setCustomEngineerNames1(customEngineerNames2);
     setStartDate2("");
     setEndDate2("");
     setNote2("");
     setShowSecondRange(false);
+    setSelectedEngineers2([]);
+    setCustomEngineerNames2([]);
+    setPendingInternalNames2([]);
+    setEngineerInput2("");
+    setShowExternalEngineerInput2(false);
   };
 
   useEffect(() => {
@@ -284,39 +447,139 @@ export default function Form() {
       .trim()
       .toLowerCase();
 
-  const addEngineerById = (id) => {
+  const addEngineerById = (id, index) => {
     const found = engineers.find((e) => String(e.id) === String(id));
     if (!found) return;
-    const exists = selectedEngineers.some(
+    const selected =
+      index === 1 ? selectedEngineers1 : selectedEngineers2;
+    const setSelected =
+      index === 1 ? setSelectedEngineers1 : setSelectedEngineers2;
+    const exists = selected.some(
       (e) => String(e.id) === String(found.id),
     );
     if (exists) return;
-    setSelectedEngineers((prev) => [...prev, found]);
+    setSelected((prev) => [...prev, found]);
   };
 
-  const addCustomEngineerName = (name) => {
+  const addCustomEngineerName = (name, index) => {
     const trimmed = String(name ?? "").trim();
     if (!trimmed) return;
     const normalized = normalizeName(trimmed);
-    const existsInSelected = selectedEngineers.some(
+    const selected =
+      index === 1 ? selectedEngineers1 : selectedEngineers2;
+    const customNames =
+      index === 1 ? customEngineerNames1 : customEngineerNames2;
+    const setCustomNames =
+      index === 1 ? setCustomEngineerNames1 : setCustomEngineerNames2;
+    const existsInSelected = selected.some(
       (e) => normalizeName(e.name) === normalized,
     );
-    const existsInCustom = customEngineerNames.some(
+    const existsInCustom = customNames.some(
       (n) => normalizeName(n) === normalized,
     );
     if (existsInSelected || existsInCustom) return;
-    setCustomEngineerNames((prev) => [...prev, trimmed]);
+    setCustomNames((prev) => [...prev, trimmed]);
   };
 
-  const removeSelectedEngineer = (id) => {
-    setSelectedEngineers((prev) =>
+  const removeSelectedEngineer = (id, index) => {
+    const setSelected =
+      index === 1 ? setSelectedEngineers1 : setSelectedEngineers2;
+    setSelected((prev) =>
       prev.filter((e) => String(e.id) !== String(id)),
     );
   };
 
-  const removeCustomEngineer = (name) => {
-    setCustomEngineerNames((prev) =>
+  const removeCustomEngineer = (name, index) => {
+    const setCustomNames =
+      index === 1 ? setCustomEngineerNames1 : setCustomEngineerNames2;
+    setCustomNames((prev) =>
       prev.filter((n) => normalizeName(n) !== normalizeName(name)),
+    );
+  };
+
+  const renderEngineerSelect = (index) => {
+    const selected =
+      index === 1 ? selectedEngineers1 : selectedEngineers2;
+    const customNames =
+      index === 1 ? customEngineerNames1 : customEngineerNames2;
+    const engineerInput =
+      index === 1 ? engineerInput1 : engineerInput2;
+    const setEngineerInput =
+      index === 1 ? setEngineerInput1 : setEngineerInput2;
+    const showExternal =
+      index === 1 ? showExternalEngineerInput1 : showExternalEngineerInput2;
+    const setShowExternal =
+      index === 1
+        ? setShowExternalEngineerInput1
+        : setShowExternalEngineerInput2;
+
+    return (
+      <View style={styles.fieldItem}>
+        <Text style={styles.fieldLabel}>* 엔지니어 성함</Text>
+        <View style={styles.engineerSelectWrap}>
+          <select
+            style={htmlInputStyle}
+            value=""
+            onChange={(e) => {
+              const nextId = e.target.value;
+              if (nextId === EXTERNAL_ENGINEER_OPTION) {
+                setShowExternal(true);
+              } else if (nextId) {
+                setShowExternal(false);
+                addEngineerById(nextId, index);
+              }
+              e.target.value = "";
+            }}
+            disabled={engineerLoading}
+          >
+            <option value="">
+              {engineerLoading ? "불러오는 중..." : "목록에서 선택"}
+            </option>
+            {engineers.map((engineer) => (
+              <option key={engineer.id} value={engineer.id}>
+                {engineer.name}
+              </option>
+            ))}
+            <option value={EXTERNAL_ENGINEER_OPTION}>외부 엔지니어</option>
+          </select>
+          {showExternal && (
+            <TextInput
+              placeholder="외부 엔지니어 이름 입력 후 Enter"
+              value={engineerInput}
+              onChangeText={setEngineerInput}
+              onSubmitEditing={() => {
+                addCustomEngineerName(engineerInput, index);
+                setEngineerInput("");
+              }}
+              style={styles.input}
+            />
+          )}
+        </View>
+        <View style={styles.engineerTagWrap}>
+          {selected.map((engineer) => (
+            <View key={engineer.id} style={styles.engineerTag}>
+              <Text style={styles.engineerTagText}>{engineer.name}</Text>
+              <TouchableOpacity
+                onPress={() => removeSelectedEngineer(engineer.id, index)}
+                style={styles.engineerTagRemove}
+              >
+                <Text style={styles.engineerTagRemoveText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          {customNames.map((name) => (
+            <View key={name} style={styles.engineerTag}>
+              <Text style={styles.engineerTagText}>{name}</Text>
+              <TouchableOpacity
+                onPress={() => removeCustomEngineer(name, index)}
+                style={styles.engineerTagRemove}
+              >
+                <Text style={styles.engineerTagRemoveText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      </View>
     );
   };
 
@@ -354,12 +617,22 @@ export default function Form() {
     const description =
       WORK_TYPE_DESCRIPTION_MAP[workType] ?? String(workType ?? "").trim();
 
-    const jobScheduleEngineers = [
-      ...selectedEngineers.map((engineer) => ({
+    const jobScheduleEngineers1 = [
+      ...selectedEngineers1.map((engineer) => ({
         engineerType: "INTERNAL",
         engineerId: engineer.id,
       })),
-      ...customEngineerNames.map((name) => ({
+      ...customEngineerNames1.map((name) => ({
+        engineerType: "EXTERNAL",
+        externalName: name,
+      })),
+    ];
+    const jobScheduleEngineers2 = [
+      ...selectedEngineers2.map((engineer) => ({
+        engineerType: "INTERNAL",
+        engineerId: engineer.id,
+      })),
+      ...customEngineerNames2.map((name) => ({
         engineerType: "EXTERNAL",
         externalName: name,
       })),
@@ -370,7 +643,7 @@ export default function Form() {
         startDate,
         endDate,
         note: note1,
-        jobScheduleEngineers,
+        jobScheduleEngineers: jobScheduleEngineers1,
       },
     ];
     if (startDate2 && endDate2) {
@@ -378,7 +651,7 @@ export default function Form() {
         startDate: startDate2,
         endDate: endDate2,
         note: note2,
-        jobScheduleEngineers,
+        jobScheduleEngineers: jobScheduleEngineers2,
       });
     }
 
@@ -432,7 +705,9 @@ export default function Form() {
           </Text>
         </View>
 
-        <View style={styles.card}>
+        <View
+          style={[styles.card, showJobSuggestions && styles.cardStackTop]}
+        >
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>신청 정보</Text>
             <Text style={styles.sectionSub}>
@@ -441,17 +716,100 @@ export default function Form() {
           </View>
           <View style={styles.sectionDivider} />
 
-          <View style={styles.fieldGroup}>
+          <View
+            style={[styles.fieldGroup, showJobSuggestions && styles.fieldGroupOverlay]}
+          >
             <Text style={styles.fieldGroupTitle}>작업 정보</Text>
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldItem}>
+            <View
+              style={[styles.fieldRow, showJobSuggestions && styles.fieldRowOverlay]}
+            >
+              <View
+                style={[styles.fieldItem, showJobSuggestions && styles.fieldItemOverlay]}
+              >
                 <Text style={styles.fieldLabel}>* 작업 번호(Job Number)</Text>
-                <TextInput
-                  placeholder="예: STKP-26000203"
-                  value={jobNumber}
-                  onChangeText={setJobNumber}
-                  style={styles.input}
-                />
+                <View style={styles.jobSuggestionAnchor}>
+                  <TextInput
+                    placeholder="예: STKP-26000203"
+                    value={jobNumber}
+                    onChangeText={(value) => {
+                      setJobNumber(value);
+                      if (!normalizeKeyword(value)) {
+                        setShowJobSuggestions(false);
+                        return;
+                      }
+                      if (!showJobSuggestions) setShowJobSuggestions(true);
+                    }}
+                    onFocus={() => setShowJobSuggestions(true)}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        if (!suggestionClickRef.current) {
+                          setShowJobSuggestions(false);
+                        }
+                        suggestionClickRef.current = false;
+                      }, 150);
+                    }}
+                    onKeyPress={(e) => {
+                      if (e?.nativeEvent?.key !== "Enter") return;
+                      const target = findSuggestionToApply();
+                      if (target) {
+                        applyQuotation(target, { force: true });
+                        setShowJobSuggestions(false);
+                      }
+                    }}
+                    onSubmitEditing={() => {
+                      const target = findSuggestionToApply();
+                      if (target) {
+                        applyQuotation(target, { force: true });
+                        setShowJobSuggestions(false);
+                      }
+                    }}
+                    style={styles.input}
+                  />
+                  {showJobSuggestions && (
+                    <View style={styles.jobSuggestionBox}>
+                      {jobSuggestionLoading && (
+                        <Text style={styles.jobSuggestionHint}>검색 중...</Text>
+                      )}
+                      {!jobSuggestionLoading && jobSuggestions.length === 0 && (
+                        <Text style={styles.jobSuggestionHint}>
+                          검색 결과가 없습니다.
+                        </Text>
+                      )}
+                      {jobSuggestions.map((item) => (
+                        <TouchableOpacity
+                          key={`${item.jobNumber}-${item.imoNumber ?? ""}`}
+                          style={styles.jobSuggestionItem}
+                          activeOpacity={0.85}
+                          onPressIn={() => {
+                            suggestionClickRef.current = true;
+                          }}
+                          onPress={() => {
+                            applyQuotation(item, { force: true });
+                            setShowJobSuggestions(false);
+                          }}
+                        >
+                          <Text style={styles.jobSuggestionTitle}>
+                            {item.jobNumber}
+                          </Text>
+                          <Text
+                            style={styles.jobSuggestionSub}
+                            numberOfLines={1}
+                          >
+                            {[
+                              item.customer,
+                              item.vesselName,
+                              item.imoNumber,
+                              item.hullNo,
+                              item.sysName,
+                            ]
+                              .filter(Boolean)
+                              .join(" / ")}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
               </View>
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 고객사명</Text>
@@ -472,6 +830,15 @@ export default function Form() {
                 />
               </View>
               <View style={styles.fieldItem}>
+                <Text style={styles.fieldLabel}>IMO Number</Text>
+                <TextInput
+                  placeholder="작업 번호 선택 시 자동 입력"
+                  value={imoNumber}
+                  editable={false}
+                  style={[styles.input, styles.inputReadOnly]}
+                />
+              </View>
+              <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>호선 번호</Text>
                 <TextInput
                   placeholder="예: HO-102"
@@ -484,104 +851,25 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <View style={styles.fieldItem}>
-              <Text style={styles.fieldLabel}>* 엔지니어 성함</Text>
-              <View style={styles.engineerSelectWrap}>
-                <select
-                  style={htmlInputStyle}
-                  value=""
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    if (nextId === EXTERNAL_ENGINEER_OPTION) {
-                      setShowExternalEngineerInput(true);
-                    } else if (nextId) {
-                      setShowExternalEngineerInput(false);
-                      addEngineerById(nextId);
-                    }
-                    e.target.value = "";
-                  }}
-                  disabled={engineerLoading}
-                >
-                  <option value="">
-                    {engineerLoading ? "불러오는 중..." : "목록에서 선택"}
-                  </option>
-                  {engineers.map((engineer) => (
-                    <option key={engineer.id} value={engineer.id}>
-                      {engineer.name}
-                    </option>
-                  ))}
-                  <option value={EXTERNAL_ENGINEER_OPTION}>
-                    외부 엔지니어
-                  </option>
-                </select>
-                {showExternalEngineerInput && (
-                  <TextInput
-                    placeholder="외부 엔지니어 이름 입력 후 Enter"
-                    value={engineerInput}
-                    onChangeText={setEngineerInput}
-                    onSubmitEditing={() => {
-                      addCustomEngineerName(engineerInput);
-                      setEngineerInput("");
-                    }}
-                    style={styles.input}
-                  />
-                )}
-              </View>
-              <View style={styles.engineerTagWrap}>
-                {selectedEngineers.map((engineer) => (
-                  <View key={engineer.id} style={styles.engineerTag}>
-                    <Text style={styles.engineerTagText}>{engineer.name}</Text>
-                    <TouchableOpacity
-                      onPress={() => removeSelectedEngineer(engineer.id)}
-                      style={styles.engineerTagRemove}
-                    >
-                      <Text style={styles.engineerTagRemoveText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                {customEngineerNames.map((name) => (
-                  <View key={name} style={styles.engineerTag}>
-                    <Text style={styles.engineerTagText}>{name}</Text>
-                    <TouchableOpacity
-                      onPress={() => removeCustomEngineer(name)}
-                      style={styles.engineerTagRemove}
-                    >
-                      <Text style={styles.engineerTagRemoveText}>×</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.fieldGroup}>
             <Text style={styles.fieldGroupTitle}>* 작업/종류/지역</Text>
             <View style={[styles.fieldRow, styles.fieldRowSpaced]}>
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 작업</Text>
-                <select
-                  style={htmlInputStyle}
+                <TextInput
+                  placeholder="작업 번호 선택 시 자동 입력"
                   value={workType}
-                  onChange={(e) => setWorkType(e.target.value)}
-                >
-                  <option value="">선택하세요</option>
-                  <option value="서비스">서비스</option>
-                  <option value="엔지니어">엔지니어</option>
-                  <option value="커미셔닝">커미셔닝</option>
-                </select>
+                  editable={false}
+                  style={[styles.input, styles.inputReadOnly]}
+                />
               </View>
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 종류</Text>
-                <select
-                  style={htmlInputStyle}
+                <TextInput
+                  placeholder="작업 번호 선택 시 자동 입력"
                   value={systemType}
-                  onChange={(e) => setSystemType(e.target.value)}
-                >
-                  <option value="">선택하세요</option>
-                  <option value="AMS">AMS</option>
-                  <option value="BMS">BMS</option>
-                  <option value="PMS">PMS</option>
-                </select>
+                  editable={false}
+                  style={[styles.input, styles.inputReadOnly]}
+                />
               </View>
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 지역</Text>
@@ -647,6 +935,8 @@ export default function Form() {
             </View>
           </View>
 
+          <View style={styles.fieldGroup}>{renderEngineerSelect(1)}</View>
+
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldGroupTitle}>* 비고</Text>
             <View style={styles.fieldRow}>
@@ -690,6 +980,11 @@ export default function Form() {
                     setStartDate2("");
                     setEndDate2("");
                     setNote2("");
+                    setSelectedEngineers2([]);
+                    setCustomEngineerNames2([]);
+                    setPendingInternalNames2([]);
+                    setEngineerInput2("");
+                    setShowExternalEngineerInput2(false);
                   }}
                   aria-label="2차 일정 제거"
                 >
@@ -718,6 +1013,7 @@ export default function Form() {
                 </View>
               </View>
             </View>
+            <View style={styles.fieldGroup}>{renderEngineerSelect(2)}</View>
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldGroupTitle}>* 비고</Text>
               <View style={styles.fieldRow}>
@@ -755,6 +1051,7 @@ export default function Form() {
           <View style={styles.previewTable}>
             <PreviewRow label="작업번호" value={jobNumber || "-"} />
             <PreviewRow label="선박명" value={vesselName || "-"} />
+            <PreviewRow label="IMO Number" value={imoNumber || "-"} />
             <PreviewRow label="호선" value={hullNo || "-"} />
             <PreviewRow label="지역" value={region || "-"} />
             <PreviewRow
@@ -770,16 +1067,29 @@ export default function Form() {
             <PreviewRow label="작업" value={workType || "-"} />
             <PreviewRow label="종류" value={systemType || "-"} />
             <PreviewRow
-              label="엔지니어"
+              label={showSecondRange ? "엔지니어(1차)" : "엔지니어"}
               value={
-                [...selectedEngineers, ...customEngineerNames].length
+                [...selectedEngineers1, ...customEngineerNames1].length
                   ? [
-                      ...selectedEngineers.map((e) => e.name),
-                      ...customEngineerNames,
+                      ...selectedEngineers1.map((e) => e.name),
+                      ...customEngineerNames1,
                     ].join(", ")
                   : "-"
               }
             />
+            {showSecondRange && (
+              <PreviewRow
+                label="엔지니어(2차)"
+                value={
+                  [...selectedEngineers2, ...customEngineerNames2].length
+                    ? [
+                        ...selectedEngineers2.map((e) => e.name),
+                        ...customEngineerNames2,
+                      ].join(", ")
+                    : "-"
+                }
+              />
+            )}
             <PreviewRow
               label={showSecondRange ? "비고(1차)" : "비고"}
               value={note1 || "-"}
@@ -927,6 +1237,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
   },
+  cardStackTop: {
+    zIndex: 9999,
+    position: "relative",
+    overflow: "visible",
+  },
   sectionHeader: {
     marginBottom: 6,
   },
@@ -957,6 +1272,11 @@ const styles = StyleSheet.create({
   fieldGroup: {
     paddingVertical: 6,
   },
+  fieldGroupOverlay: {
+    zIndex: 9999,
+    position: "relative",
+    overflow: "visible",
+  },
   fieldGroupHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -975,12 +1295,22 @@ const styles = StyleSheet.create({
     gap: 14,
     flexWrap: "wrap",
   },
+  fieldRowOverlay: {
+    zIndex: 9999,
+    position: "relative",
+    overflow: "visible",
+  },
   fieldRowSpaced: {
     marginTop: 12,
   },
   fieldItem: {
     flexGrow: 1,
     minWidth: 200,
+  },
+  fieldItemOverlay: {
+    zIndex: 9999,
+    position: "relative",
+    overflow: "visible",
   },
   fieldItemFull: {
     minWidth: "100%",
@@ -1034,11 +1364,51 @@ const styles = StyleSheet.create({
     minWidth: 180,
     flexGrow: 1,
   },
+  inputReadOnly: {
+    backgroundColor: "#F8FAFC",
+    color: "#475569",
+  },
   engineerSelectWrap: {
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
     flexWrap: "wrap",
+  },
+  jobSuggestionBox: {
+    position: "absolute",
+    top: 44,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    overflow: "auto",
+    maxHeight: 220,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  jobSuggestionItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  jobSuggestionTitle: { fontSize: 13, fontWeight: "700", color: "#0F172A" },
+  jobSuggestionSub: { fontSize: 12, color: "#64748B", marginTop: 4 },
+  jobSuggestionHint: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12,
+    color: "#94A3B8",
+  },
+  jobSuggestionAnchor: {
+    position: "relative",
+    zIndex: 9999,
   },
   engineerTagWrap: {
     flexDirection: "row",

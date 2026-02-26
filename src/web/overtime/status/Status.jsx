@@ -228,6 +228,7 @@ function Item({ item, onDeleted }) {
       requestDate: item.requestDate,
       startTime: item.startTime,
       endTime: item.endTime,
+      imageUrl: item.imageUrl,
     });
   };
 

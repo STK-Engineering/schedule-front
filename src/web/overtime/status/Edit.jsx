@@ -8,6 +8,9 @@ import {
   Image,
   Alert,
   useWindowDimensions,
+  StyleSheet,
+  Platform,
+  Modal,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import PageLayout from "../../../components/PageLayout";
@@ -53,6 +56,7 @@ const parseTimeToMinutes = (value) => {
 
 const MIN_OVERTIME_MINUTES = 30;
 const MAX_OVERTIME_MINUTES = 12 * 60;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const getOvertimeDiffMinutes = (start, end) => {
   const startMinutes = parseTimeToMinutes(start);
@@ -83,6 +87,15 @@ const showIntervalAlert = () => {
   Alert.alert("입력 오류", message);
 };
 
+const showImageSizeAlert = () => {
+  const message = "이미지 용량은 5MB 이하만 첨부할 수 있습니다.";
+  if (typeof window !== "undefined" && typeof window.alert === "function") {
+    window.alert(message);
+    return;
+  }
+  Alert.alert("입력 오류", message);
+};
+
 export default function OvertimeEdit() {
   const navigation = useNavigation();
   const route = useRoute();
@@ -99,9 +112,17 @@ export default function OvertimeEdit() {
   const [requestDate, setRequestDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [attachments, setAttachments] = useState([]);
+  const [existingImageUrl, setExistingImageUrl] = useState("");
+  const [removeImage, setRemoveImage] = useState(false);
+  const [isDragOverImageZone, setIsDragOverImageZone] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewImageUri, setPreviewImageUri] = useState("");
   const [isChecked, setChecked] = useState(false);
   const [attemptedCheck, setAttemptedCheck] = useState(false);
   const endTimeAlertTimerRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const dragDepthRef = useRef(0);
 
   useEffect(() => {
     if (!id) {
@@ -117,6 +138,8 @@ export default function OvertimeEdit() {
     setRequestDate(params.requestDate ?? "");
     setStartTime(normalizeTimeValue(params.startTime ?? ""));
     setEndTime(normalizeTimeValue(params.endTime ?? ""));
+    setExistingImageUrl(params.imageUrl ?? "");
+    setRemoveImage(false);
   }, [id]);
 
   const hasVesselOrHull =
@@ -143,6 +166,128 @@ export default function OvertimeEdit() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const getDataTransfer = (event) =>
+      event?.dataTransfer ?? event?.nativeEvent?.dataTransfer;
+
+    const hasFileType = (event) => {
+      const types = Array.from(getDataTransfer(event)?.types ?? []);
+      return types.includes("Files");
+    };
+
+    const preventBrowserFileDrop = (event) => {
+      if (!hasFileType(event)) return;
+      event.preventDefault();
+    };
+
+    window.addEventListener("dragover", preventBrowserFileDrop);
+    window.addEventListener("drop", preventBrowserFileDrop);
+
+    return () => {
+      window.removeEventListener("dragover", preventBrowserFileDrop);
+      window.removeEventListener("drop", preventBrowserFileDrop);
+    };
+  }, []);
+
+  const fileToDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const openImagePicker = () => {
+    if (imageInputRef.current) imageInputRef.current.click();
+  };
+
+  const appendImageFiles = async (incomingFiles) => {
+    const files = Array.from(incomingFiles ?? []).filter((file) =>
+      String(file?.type ?? "").startsWith("image/"),
+    );
+    if (!files.length) {
+      return;
+    }
+
+    try {
+      const file = files[0];
+      if (file.size > MAX_IMAGE_BYTES) {
+        showImageSizeAlert();
+        return;
+      }
+      const uploaded = {
+        id: `${Date.now()}-${file.name}`,
+        name: file.name,
+        file,
+        dataUrl: await fileToDataUrl(file),
+      };
+      setAttachments([uploaded]);
+      setRemoveImage(false);
+    } catch (err) {
+      console.error("이미지 변환 실패", err);
+      Alert.alert("실패", "이미지 첨부에 실패했습니다.");
+    }
+  };
+
+  const handleImageSelect = async (e) => {
+    try {
+      await appendImageFiles(e?.target?.files);
+    } finally {
+      if (e?.target) e.target.value = "";
+    }
+  };
+
+  const handleImageDragOver = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsDragOverImageZone(true);
+  };
+
+  const handleImageDragEnter = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragOverImageZone(true);
+  };
+
+  const handleImageDragLeave = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragOverImageZone(false);
+    }
+  };
+
+  const handleImageDrop = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOverImageZone(false);
+    const droppedFiles =
+      e?.dataTransfer?.files ?? e?.nativeEvent?.dataTransfer?.files;
+    if (!droppedFiles?.length) return;
+    await appendImageFiles(droppedFiles);
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const openPreviewModal = (imageUri) => {
+    const uri = imageUri || attachments[0]?.dataUrl || existingImageUrl;
+    if (!uri) return;
+    setPreviewImageUri(uri);
+    setPreviewModalOpen(true);
+  };
+
+  const closePreviewModal = () => {
+    setPreviewModalOpen(false);
+    setPreviewImageUri("");
+  };
 
   const handleEndTimeChange = (value) => {
     const nextEndTime = normalizeTimeValue(value);
@@ -185,10 +330,34 @@ export default function OvertimeEdit() {
       requestDate,
       startTime: withSeconds(normalizeTimeValue(startTime)),
       endTime: withSeconds(normalizeTimeValue(endTime)),
+      removeImage,
     };
 
     try {
-      await api.put(`/overtime/${id}`, payload);
+      const formData = new FormData();
+      const overTimeRequestBlob = new Blob([JSON.stringify(payload)], {
+        type: "application/json",
+      });
+      formData.append("overTimeRequest", overTimeRequestBlob);
+
+      const newAttachment = attachments[0]?.file;
+      if (newAttachment) {
+        formData.append(
+          "file",
+          newAttachment,
+          newAttachment?.name || "upload",
+        );
+      } else {
+        const emptyFile = new Blob([], { type: "application/octet-stream" });
+        formData.append("file", emptyFile, "null");
+      }
+
+      await api.put(`/overtime/${id}`, formData, {
+        transformRequest: (data, headers) => {
+          if (headers) delete headers["Content-Type"];
+          return data;
+        },
+      });
       Alert.alert("완료", "연장 근로 신청이 수정되었습니다.");
       navigation.navigate("OverTimeStatus");
     } catch (err) {
@@ -295,6 +464,167 @@ export default function OvertimeEdit() {
           </View>
 
           <View style={styles.fieldGroup}>
+            <Text style={styles.fieldGroupTitle}>이미지 첨부</Text>
+
+            {Platform.OS === "web" ? (
+              <div
+                onDragEnter={handleImageDragEnter}
+                onDragOver={handleImageDragOver}
+                onDragLeave={handleImageDragLeave}
+                onDrop={handleImageDrop}
+                style={{
+                  ...StyleSheet.flatten([
+                    styles.imageAttachPanel,
+                    isDragOverImageZone && styles.imageAttachPanelActive,
+                  ]),
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  style={{ display: "none" }}
+                />
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={openImagePicker}
+                >
+                  <Text style={styles.imageUploadButtonText}>이미지 선택</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.imageHintText}>
+                  드래그하거나 버튼으로 선택 (최대 5MB)
+                </Text>
+
+                {(attachments.length > 0 || (existingImageUrl && !removeImage)) && (
+                  <View style={styles.imageList}>
+                    {(attachments.length > 0
+                      ? attachments.map((item) => ({
+                          ...item,
+                          isExisting: false,
+                        }))
+                      : [
+                          {
+                            id: "existing",
+                            name: "현재 이미지",
+                            dataUrl: existingImageUrl,
+                            isExisting: true,
+                          },
+                        ]
+                    ).map((item) => (
+                      <View key={item.id} style={styles.imageCard}>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => openPreviewModal(item.dataUrl)}
+                        >
+                          <Image
+                            source={{ uri: item.dataUrl }}
+                            style={styles.imageThumb}
+                          />
+                        </TouchableOpacity>
+                        <Text style={styles.imageName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.imageRemoveButton}
+                          onPress={() => {
+                            if (item.isExisting) {
+                              setRemoveImage((prev) => !prev);
+                            } else {
+                              removeAttachment(item.id);
+                            }
+                          }}
+                        >
+                          <Text style={styles.imageRemoveButtonText}>
+                            {item.isExisting && removeImage ? "삭제 취소" : "삭제"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </div>
+            ) : (
+              <View
+                style={[
+                  styles.imageAttachPanel,
+                  isDragOverImageZone && styles.imageAttachPanelActive,
+                ]}
+              >
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  style={{ display: "none" }}
+                />
+                <TouchableOpacity
+                  style={styles.imageUploadButton}
+                  onPress={openImagePicker}
+                >
+                  <Text style={styles.imageUploadButtonText}>이미지 선택</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.imageHintText}>
+                  드래그하거나 버튼으로 선택 (최대 5MB)
+                </Text>
+
+                {(attachments.length > 0 || (existingImageUrl && !removeImage)) && (
+                  <View style={styles.imageList}>
+                    {(attachments.length > 0
+                      ? attachments.map((item) => ({
+                          ...item,
+                          isExisting: false,
+                        }))
+                      : [
+                          {
+                            id: "existing",
+                            name: "현재 이미지",
+                            dataUrl: existingImageUrl,
+                            isExisting: true,
+                          },
+                        ]
+                    ).map((item) => (
+                      <View key={item.id} style={styles.imageCard}>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => openPreviewModal(item.dataUrl)}
+                        >
+                          <Image
+                            source={{ uri: item.dataUrl }}
+                            style={styles.imageThumb}
+                          />
+                        </TouchableOpacity>
+                        <Text style={styles.imageName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.imageRemoveButton}
+                          onPress={() => {
+                            if (item.isExisting) {
+                              setRemoveImage((prev) => !prev);
+                            } else {
+                              removeAttachment(item.id);
+                            }
+                          }}
+                        >
+                          <Text style={styles.imageRemoveButtonText}>
+                            {item.isExisting && removeImage ? "삭제 취소" : "삭제"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.fieldGroup}>
             <Text style={styles.fieldGroupTitle}>작업 내용</Text>
             <View style={styles.fieldRow}>
               <View style={[styles.fieldItem, styles.fieldItemFull]}>
@@ -359,6 +689,35 @@ export default function OvertimeEdit() {
               value={jobDescription || "-"}
               multiline
             />
+            <View style={styles.tableRow}>
+              <View style={styles.tableLabelCell}>
+                <Text style={styles.tableLabel}>이미지</Text>
+              </View>
+              <View style={styles.tableValueCell}>
+                {attachments.length > 0 || (existingImageUrl && !removeImage) ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      openPreviewModal(
+                        attachments[0]?.dataUrl ||
+                          (removeImage ? "" : existingImageUrl)
+                      )
+                    }
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          attachments[0]?.dataUrl ||
+                          (removeImage ? "" : existingImageUrl),
+                      }}
+                      style={styles.previewImage}
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.tableValue}>첨부 없음</Text>
+                )}
+              </View>
+            </View>
           </View>
         </View>
 
@@ -430,6 +789,36 @@ export default function OvertimeEdit() {
           <Text style={styles.backButtonText}>뒤로</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={previewModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closePreviewModal}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={closePreviewModal}
+          style={styles.previewModalOverlay}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={styles.previewModalBox}
+          >
+            {!!previewImageUri && (
+              <Image
+                source={{ uri: previewImageUri }}
+                style={styles.previewModalImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity onPress={closePreviewModal}>
+              <Text style={styles.previewModalCloseText}>닫기</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </PageLayout>
   );
 }
@@ -633,6 +1022,115 @@ const styles = {
   tableLabel: { fontSize: 13, fontWeight: "600", color: "#475569" },
   tableValue: { fontSize: 14, color: "#0F172A", lineHeight: 20 },
   tableValueMultiline: { lineHeight: 20 },
+  imageAttachPanel: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    gap: 10,
+    alignItems: "center",
+  },
+  imageAttachPanelActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  imageUploadButton: {
+    alignSelf: "center",
+    width: 80,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    justifyContent: "center",
+  },
+  imageUploadButtonText: {
+    color: "#8f8f8fff",
+    fontSize: 12,
+    fontWeight: "400",
+    textAlign: "center",
+  },
+  imageHintText: {
+    color: "#64748B",
+    fontSize: 12,
+    textAlign: "center",
+    alignSelf: "center",
+    maxWidth: 240,
+  },
+  imageList: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "center",
+  },
+  imageCard: {
+    width: 170,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    padding: 8,
+    gap: 8,
+  },
+  imageThumb: {
+    width: "100%",
+    height: 90,
+    borderRadius: 6,
+    backgroundColor: "#E5E7EB",
+  },
+  imageName: {
+    fontSize: 12,
+    color: "#334155",
+  },
+  imageRemoveButton: {
+    alignSelf: "flex-end",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#FEE2E2",
+  },
+  imageRemoveButtonText: {
+    fontSize: 11,
+    color: "#B91C1C",
+    fontWeight: "600",
+  },
+  previewImage: {
+    width: 260,
+    height: 160,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  previewModalOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    padding: 20,
+  },
+  previewModalBox: {
+    width: "100%",
+    maxWidth: 900,
+    maxHeight: "90%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    padding: 16,
+    alignItems: "center",
+    gap: 12,
+  },
+  previewModalImage: {
+    width: "100%",
+    height: 480,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+  },
+  previewModalCloseText: {
+    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   backButton: {
     alignSelf: "center",
     paddingVertical: 10,

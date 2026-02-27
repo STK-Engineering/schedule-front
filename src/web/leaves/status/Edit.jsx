@@ -331,8 +331,7 @@ export default function Edit() {
     leaveType &&
     startDate &&
     endDate &&
-    reason.trim().length > 0 &&
-    etc.trim().length > 0;
+    reason.trim().length > 0;
 
   const previewPeriod = useMemo(
     () => formatPeriodByUsedDays(startDate, endDate, holidayDateSet),

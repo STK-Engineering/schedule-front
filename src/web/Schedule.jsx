@@ -26,6 +26,13 @@ function leaveTypeToTimeRange(leaveType) {
   }
 }
 
+function approvalSuffix(item) {
+  const status = item?.approvalStatusDisplay ?? item?.approvalStatus ?? "";
+  const text = String(status);
+  if (text.includes("대기")) return " (결재 대기 중)";
+  return "";
+}
+
 function toDate(dateStr, h, m) {
   const dateKey = normalizeHolidayDate(dateStr);
   if (!dateKey) return null;
@@ -52,7 +59,7 @@ function leaveToEvents(item, holidayDateSet) {
 
   const { startH, startM, endH, endM } = leaveTypeToTimeRange(leaveType);
 
-  const title = `${empName}${deptName ? ` (${deptName})` : ""} - ${leaveType}`;
+  const title = `${empName} - ${leaveType}${approvalSuffix(item)}`;
   const startDate = normalizeHolidayDate(item?.startDate);
   const endDate = normalizeHolidayDate(item?.endDate) || startDate;
   if (!startDate || !endDate) return [];
@@ -135,7 +142,7 @@ function overtimeToEvent(item) {
   const start = toDate(requestDate, startParts.h, startParts.m);
   const end = toDate(requestDate, endParts.h, endParts.m);
 
-  const title = `${empName}${deptName ? ` (${deptName})` : ""} - 연장근로`;
+  const title = `${empName} - 연장근로${approvalSuffix(item)}`;
 
   return {
     title,
@@ -508,9 +515,7 @@ export default function Schedule() {
         list = res.data ?? [];
       }
 
-      const approvedOnly = list.filter(
-        (item) => item.approvalStatusDisplay === "승인"
-      );
+      const approvedOnly = list;
 
       if (onlyMine) {
         const overtimeRes = await api.get("/overtime/me");
@@ -529,9 +534,7 @@ export default function Schedule() {
         const overtimeRes = await api.get("/overtime");
         overtimeList = Array.isArray(overtimeRes.data) ? overtimeRes.data : [];
       }
-      const approvedOvertimeOnly = overtimeList.filter(
-        (item) => item.approvalStatusDisplay === "승인"
-      );
+      const approvedOvertimeOnly = overtimeList;
 
       const deptSet = new Set(DEFAULT_DEPARTMENTS);
 
@@ -1041,12 +1044,30 @@ export default function Schedule() {
               },
             };
             return (
-              <DefaultCalendarEventRenderer
-                event={event}
-                touchableOpacityProps={mergedProps}
-                textColor={style.text ?? "#334155"}
-                showTime={false}
-              />
+              <TouchableOpacity
+                {...mergedProps}
+                style={[
+                  touchableOpacityProps?.style,
+                  {
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  },
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={{
+                    color: style.text ?? "#334155",
+                    fontSize: 12,
+                    flexShrink: 1,
+                  }}
+                >
+                  {event?.title ?? ""}
+                </Text>
+              </TouchableOpacity>
             );
           }}
           eventCellStyle={(e) => {

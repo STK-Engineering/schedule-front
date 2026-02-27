@@ -27,6 +27,18 @@ const htmlInputStyle = {
 };
 
 const EXTERNAL_ENGINEER_OPTION = "__EXTERNAL_ENGINEER__";
+const EXTERNAL_ENGINEER_PRESET_PREFIX = "__EXTERNAL_ENGINEER_PRESET__:";
+const EXTERNAL_ENGINEER_PRESETS = [
+  "건우파워텍",
+  "KEJIMARIN (ALLEN)",
+  "STUCKE (Tingjie)",
+  "한나엔지니어링",
+  "마린코리아",
+  "YJ TECH",
+  "삼영오토메이션",
+  "한라시스템",
+  "제타",
+];
 const WORK_TYPE_DESCRIPTION_MAP = {
   서비스: "SERVICE",
   엔지니어: "ENGINEERING",
@@ -68,7 +80,7 @@ export default function Form() {
   const params = route?.params ?? {};
   const isEdit = params?.mode === "edit";
   const source = params?.source ?? null;
-  const editId = isEdit ? source?.id ?? params?.id : null;
+  const editId = isEdit ? (source?.id ?? params?.id) : null;
   const { width } = useWindowDimensions();
   const isNarrow = width < 1024;
 
@@ -168,8 +180,7 @@ export default function Form() {
     if (!keyword) return null;
     return (
       jobSuggestions.find(
-        (item) =>
-          String(item?.jobNumber ?? "").toLowerCase() === keyword,
+        (item) => String(item?.jobNumber ?? "").toLowerCase() === keyword,
       ) || jobSuggestions[0]
     );
   };
@@ -190,7 +201,10 @@ export default function Form() {
         const res = await api.get("/engineer-schedule/quotation", {
           params: { keyword, page: 0, size: 50 },
         });
-        if (!mounted || currentRequestId !== jobSuggestionRequestIdRef.current) {
+        if (
+          !mounted ||
+          currentRequestId !== jobSuggestionRequestIdRef.current
+        ) {
           return;
         }
         const list = Array.isArray(res.data?.content) ? res.data.content : [];
@@ -205,7 +219,10 @@ export default function Form() {
           applyQuotation(exact, { force: false });
         }
       } catch (e) {
-        if (!mounted || currentRequestId !== jobSuggestionRequestIdRef.current) {
+        if (
+          !mounted ||
+          currentRequestId !== jobSuggestionRequestIdRef.current
+        ) {
           return;
         }
         setJobSuggestions([]);
@@ -243,12 +260,17 @@ export default function Form() {
     setImoNumber(source.imoNumber ?? "");
     setHullNo(source.hullNo ?? "");
     setJobDescription(
-      source.serviceDescription ?? source.jobDescription ?? source.sysName ?? "",
+      source.serviceDescription ??
+        source.jobDescription ??
+        source.sysName ??
+        "",
     );
     setRegion(source.region ?? "");
     const description = String(source.description ?? "").trim();
     setWorkType(
-      source.divisionType ?? DESCRIPTION_WORK_TYPE_MAP[description] ?? description,
+      source.divisionType ??
+        DESCRIPTION_WORK_TYPE_MAP[description] ??
+        description,
     );
     setSystemType(source.sysName ?? source.systemType ?? "");
 
@@ -291,7 +313,9 @@ export default function Form() {
     setPendingInternalNames1(internalNames1);
 
     if (secondSchedule) {
-      const engineerList2 = Array.isArray(secondSchedule.jobScheduleEngineerList)
+      const engineerList2 = Array.isArray(
+        secondSchedule.jobScheduleEngineerList,
+      )
         ? secondSchedule.jobScheduleEngineerList
         : [];
       const internalNames2 = engineerList2
@@ -450,13 +474,10 @@ export default function Form() {
   const addEngineerById = (id, index) => {
     const found = engineers.find((e) => String(e.id) === String(id));
     if (!found) return;
-    const selected =
-      index === 1 ? selectedEngineers1 : selectedEngineers2;
+    const selected = index === 1 ? selectedEngineers1 : selectedEngineers2;
     const setSelected =
       index === 1 ? setSelectedEngineers1 : setSelectedEngineers2;
-    const exists = selected.some(
-      (e) => String(e.id) === String(found.id),
-    );
+    const exists = selected.some((e) => String(e.id) === String(found.id));
     if (exists) return;
     setSelected((prev) => [...prev, found]);
   };
@@ -465,8 +486,7 @@ export default function Form() {
     const trimmed = String(name ?? "").trim();
     if (!trimmed) return;
     const normalized = normalizeName(trimmed);
-    const selected =
-      index === 1 ? selectedEngineers1 : selectedEngineers2;
+    const selected = index === 1 ? selectedEngineers1 : selectedEngineers2;
     const customNames =
       index === 1 ? customEngineerNames1 : customEngineerNames2;
     const setCustomNames =
@@ -484,9 +504,7 @@ export default function Form() {
   const removeSelectedEngineer = (id, index) => {
     const setSelected =
       index === 1 ? setSelectedEngineers1 : setSelectedEngineers2;
-    setSelected((prev) =>
-      prev.filter((e) => String(e.id) !== String(id)),
-    );
+    setSelected((prev) => prev.filter((e) => String(e.id) !== String(id)));
   };
 
   const removeCustomEngineer = (name, index) => {
@@ -498,12 +516,10 @@ export default function Form() {
   };
 
   const renderEngineerSelect = (index) => {
-    const selected =
-      index === 1 ? selectedEngineers1 : selectedEngineers2;
+    const selected = index === 1 ? selectedEngineers1 : selectedEngineers2;
     const customNames =
       index === 1 ? customEngineerNames1 : customEngineerNames2;
-    const engineerInput =
-      index === 1 ? engineerInput1 : engineerInput2;
+    const engineerInput = index === 1 ? engineerInput1 : engineerInput2;
     const setEngineerInput =
       index === 1 ? setEngineerInput1 : setEngineerInput2;
     const showExternal =
@@ -522,7 +538,13 @@ export default function Form() {
             value=""
             onChange={(e) => {
               const nextId = e.target.value;
-              if (nextId === EXTERNAL_ENGINEER_OPTION) {
+              if (nextId.startsWith(EXTERNAL_ENGINEER_PRESET_PREFIX)) {
+                const name = nextId.slice(
+                  EXTERNAL_ENGINEER_PRESET_PREFIX.length,
+                );
+                setShowExternal(false);
+                addCustomEngineerName(name, index);
+              } else if (nextId === EXTERNAL_ENGINEER_OPTION) {
                 setShowExternal(true);
               } else if (nextId) {
                 setShowExternal(false);
@@ -540,7 +562,19 @@ export default function Form() {
                 {engineer.name}
               </option>
             ))}
-            <option value={EXTERNAL_ENGINEER_OPTION}>외부 엔지니어</option>
+            {EXTERNAL_ENGINEER_PRESETS.length > 0 && (
+              <optgroup label="외부 엔지니어">
+                {EXTERNAL_ENGINEER_PRESETS.map((name) => (
+                  <option
+                    key={`${EXTERNAL_ENGINEER_PRESET_PREFIX}${name}`}
+                    value={`${EXTERNAL_ENGINEER_PRESET_PREFIX}${name}`}
+                  >
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            <option value={EXTERNAL_ENGINEER_OPTION}>텍스트 입력</option>
           </select>
           {showExternal && (
             <TextInput
@@ -598,7 +632,10 @@ export default function Form() {
       return;
     }
     if ((startDate2 && !endDate2) || (!startDate2 && endDate2)) {
-      Alert.alert("입력 오류", "2차 기간은 시작일과 종료일을 모두 입력해주세요.");
+      Alert.alert(
+        "입력 오류",
+        "2차 기간은 시작일과 종료일을 모두 입력해주세요.",
+      );
       return;
     }
     if ((startDate2 || endDate2) && !requestDates2) {
@@ -678,7 +715,10 @@ export default function Form() {
       navigation.navigate("SchedulingList");
     } catch (err) {
       console.error(isEdit ? "수정 실패" : "신청 실패", err);
-      Alert.alert("실패", isEdit ? "일정 수정에 실패했습니다." : "등록에 실패했습니다.");
+      Alert.alert(
+        "실패",
+        isEdit ? "일정 수정에 실패했습니다." : "등록에 실패했습니다.",
+      );
     }
   };
 
@@ -705,26 +745,31 @@ export default function Form() {
           </Text>
         </View>
 
-        <View
-          style={[styles.card, showJobSuggestions && styles.cardStackTop]}
-        >
+        <View style={[styles.card, showJobSuggestions && styles.cardStackTop]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>신청 정보</Text>
-            <Text style={styles.sectionSub}>
-              * 표시는 필수 항목입니다.
-            </Text>
+            <Text style={styles.sectionSub}>* 표시는 필수 항목입니다.</Text>
           </View>
           <View style={styles.sectionDivider} />
 
           <View
-            style={[styles.fieldGroup, showJobSuggestions && styles.fieldGroupOverlay]}
+            style={[
+              styles.fieldGroup,
+              showJobSuggestions && styles.fieldGroupOverlay,
+            ]}
           >
             <Text style={styles.fieldGroupTitle}>작업 정보</Text>
             <View
-              style={[styles.fieldRow, showJobSuggestions && styles.fieldRowOverlay]}
+              style={[
+                styles.fieldRow,
+                showJobSuggestions && styles.fieldRowOverlay,
+              ]}
             >
               <View
-                style={[styles.fieldItem, showJobSuggestions && styles.fieldItemOverlay]}
+                style={[
+                  styles.fieldItem,
+                  showJobSuggestions && styles.fieldItemOverlay,
+                ]}
               >
                 <Text style={styles.fieldLabel}>* 작업 번호(Job Number)</Text>
                 <View style={styles.jobSuggestionAnchor}>
@@ -814,9 +859,20 @@ export default function Form() {
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 고객사명</Text>
                 <TextInput
-                  placeholder="예: STKP-26000203"
+                  placeholder="예: 에스티케이엔지니어링 주식회사"
                   value={customer}
                   onChangeText={setCustomer}
+                  style={styles.input}
+                />
+              </View>
+            </View>
+            <View style={[styles.fieldRow, styles.fieldRowSpaced]}>
+              <View style={styles.fieldItem}>
+                <Text style={styles.fieldLabel}>고유 번호(IMO Number)</Text>
+                <TextInput
+                  placeholder="예: 1234567"
+                  value={imoNumber}
+                  onChangeText={setImoNumber}
                   style={styles.input}
                 />
               </View>
@@ -827,15 +883,6 @@ export default function Form() {
                   value={vesselName}
                   onChangeText={setVesselName}
                   style={styles.input}
-                />
-              </View>
-              <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>IMO Number</Text>
-                <TextInput
-                  placeholder="작업 번호 선택 시 자동 입력"
-                  value={imoNumber}
-                  editable={false}
-                  style={[styles.input, styles.inputReadOnly]}
                 />
               </View>
               <View style={styles.fieldItem}>
@@ -856,19 +903,19 @@ export default function Form() {
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 작업</Text>
                 <TextInput
-                  placeholder="작업 번호 선택 시 자동 입력"
+                  placeholder="예: COMMISSIONING"
                   value={workType}
-                  editable={false}
-                  style={[styles.input, styles.inputReadOnly]}
+                  onChangeText={setWorkType}
+                  style={styles.input}
                 />
               </View>
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 종류</Text>
                 <TextInput
-                  placeholder="작업 번호 선택 시 자동 입력"
+                  placeholder="예: SERVICE"
                   value={systemType}
-                  editable={false}
-                  style={[styles.input, styles.inputReadOnly]}
+                  onChangeText={setSystemType}
+                  style={styles.input}
                 />
               </View>
               <View style={styles.fieldItem}>
@@ -1059,7 +1106,9 @@ export default function Form() {
               value={
                 startDate
                   ? `${startDate} ~ ${endDate}${
-                      startDate2 && endDate2 ? ` / ${startDate2} ~ ${endDate2}` : ""
+                      startDate2 && endDate2
+                        ? ` / ${startDate2} ~ ${endDate2}`
+                        : ""
                     }`
                   : "-"
               }

@@ -26,6 +26,12 @@ function leaveTypeToTimeRange(leaveType) {
   }
 }
 
+function normalizeName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 function approvalSuffix(item) {
   const status = item?.approvalStatusDisplay ?? item?.approvalStatus ?? "";
   const text = String(status);
@@ -158,6 +164,83 @@ function overtimeToEvent(item) {
       isOvertime: true,
     },
   };
+}
+
+function scheduleToEvents(item, currentUserKey) {
+  const schedules = Array.isArray(item?.jobScheduleList)
+    ? item.jobScheduleList
+    : [];
+  if (schedules.length === 0) return [];
+
+  const vesselName = item?.vesselName ?? "";
+  const region = item?.region ?? "";
+  const workType = item?.description ?? item?.workType ?? "";
+  const systemType = item?.systemType ?? item?.sysName ?? "";
+
+  return schedules.flatMap((schedule, index) => {
+    const startKey = normalizeHolidayDate(schedule?.startDate);
+    const endKey = normalizeHolidayDate(schedule?.endDate) || startKey;
+    if (!startKey || !endKey) return [];
+
+    const start = toDate(startKey, 0, 0);
+    const end = toDate(endKey, 23, 59);
+    if (!start || !end) return [];
+
+    const engineerList = Array.isArray(schedule?.jobScheduleEngineerList)
+      ? schedule.jobScheduleEngineerList
+      : [];
+    const engineers =
+      engineerList.length > 0 ? engineerList : [{ engineerName: "-" }];
+
+    return engineers.map((engineer, engineerIndex) => {
+      const engineerName =
+        engineer?.engineerName ??
+        engineer?.externalName ??
+        engineer?.name ??
+        "-";
+      const departmentName =
+        engineer?.department?.name ??
+        engineer?.department ??
+        engineer?.departmentName ??
+        engineer?.engineerDepartment ??
+        engineer?.engineerDepartmentName ??
+        (engineer?.engineerType === "INTERNAL" ? "ENGINEERING" : "");
+      const isMine =
+        currentUserKey && normalizeName(engineerName) === currentUserKey;
+      const title = `${engineerName || "-"}-${vesselName || "-"}-${region || "-"}`;
+      return {
+        title,
+        start,
+        end,
+        isMine,
+        raw: {
+          isSchedule: true,
+          leaveType: "작업 일정",
+          reason: schedule?.note ?? item?.jobDescription ?? "",
+          employee: {
+            name: engineerName || "엔지니어",
+            department: { name: departmentName ?? "" },
+          },
+          schedule: {
+            id:
+              schedule?.id ??
+              `${item?.id ?? "item"}-${index}-${engineerIndex}`,
+            jobNumber: item?.jobNumber ?? "",
+            workType,
+            systemType,
+            region: item?.region ?? "",
+            vesselName: item?.vesselName ?? "",
+            hullNo: item?.hullNo ?? "",
+            imoNumber: item?.imoNumber ?? "",
+            customer: item?.customer ?? "",
+            jobDescription: item?.jobDescription ?? "",
+            engineerName: engineerName || "",
+            note: schedule?.note ?? "",
+          },
+        },
+      };
+    });
+  });
 }
 
 function normalizeHolidayDate(value) {
@@ -305,6 +388,7 @@ const LEAVE_TYPES_UNIFIED = new Set([
 const LEAVE_TYPE_STYLES = {
   연장근로: { bg: "#E0F2FE", border: "#93C5FD", text: "#1D4ED8" },
   공휴일: { bg: "#F4F7FB", border: "#E8B8B8", text: "#B42323" },
+  "작업 일정": { bg: "#FEF9C3", border: "#FACC15", text: "#A16207" },
 };
 
 const getLeaveTypeStyle = (leaveType) => {
@@ -373,6 +457,7 @@ export default function Schedule() {
   const [loading, setLoading] = useState(false);
   const [showLeave, setShowLeave] = useState(true);
   const [showOvertime, setShowOvertime] = useState(true);
+  const [showSchedule, setShowSchedule] = useState(true);
 
   const openEventModal = (event, pressEvent) => {
     setSelectedEvent(event);
@@ -441,6 +526,12 @@ export default function Schedule() {
   ];
 
   const detail = selectedEvent?.raw;
+  const scheduleDetail = detail?.schedule ?? {};
+  const scheduleHullInfo =
+    [scheduleDetail?.hullNo, scheduleDetail?.imoNumber]
+      .filter(Boolean)
+      .join(" / ") || "-";
+  const isSchedule = detail?.isSchedule;
   const employeeName = detail?.employee?.name ?? "-";
   const displayName = detail?.isHoliday
     ? detail?.dateName ?? detail?.name ?? "공휴일"
@@ -485,10 +576,12 @@ export default function Schedule() {
 
   const [onlyMine, setOnlyMine] = useState(false);
   const [deptOpen, setDeptOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState({ name: "", department: "" });
 
   const [dragStartX, setDragStartX] = useState(null);
   const [approvedLeaves, setApprovedLeaves] = useState([]);
   const [approvedOvertime, setApprovedOvertime] = useState([]);
+  const [scheduleItems, setScheduleItems] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [holidayCache, setHolidayCache] = useState({});
 
@@ -595,12 +688,56 @@ export default function Schedule() {
   }, [currentDate, holidayCache]);
 
   useEffect(() => {
+    let mounted = true;
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await api.get("/balances");
+        const data = res?.data ?? {};
+        if (!mounted) return;
+        setCurrentUser({
+          name: data.name ?? data.employee?.name ?? "",
+          department:
+            data.department ?? data.employee?.department?.name ?? "",
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setCurrentUser({ name: "", department: "" });
+      }
+    };
+
+    fetchCurrentUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const fetchSchedules = useCallback(async () => {
+    try {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const res = await api.get("/engineer-schedule", {
+        params: { year, month },
+      });
+      const list = Array.isArray(res.data) ? res.data : [];
+      setScheduleItems(list);
+    } catch (e) {
+      console.error("스케줄링 일정 불러오기 실패", e);
+      setScheduleItems([]);
+    }
+  }, [currentDate]);
+
+  useEffect(() => {
     fetchLeaves();
   }, [fetchLeaves]);
 
   useEffect(() => {
     fetchHolidays();
   }, [fetchHolidays]);
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [fetchSchedules]);
 
   useEffect(() => {
     setCurrentDate((prev) => normalizeForMode(prev, mode));
@@ -611,6 +748,7 @@ export default function Schedule() {
   }, [departments]);
 
   const events = useMemo(() => {
+    const currentUserKey = normalizeName(currentUser?.name);
     const holidayDateSet = new Set(
       holidays
         .map((holiday) => normalizeHolidayDate(holiday?.date))
@@ -638,17 +776,45 @@ export default function Schedule() {
     const overtimeEvents = filteredOvertime
       .map(overtimeToEvent)
       .filter(Boolean);
+    const scheduleEvents = scheduleItems.flatMap((item) =>
+      scheduleToEvents(item, currentUserKey)
+    );
+    const filteredSchedules =
+      selectedDept.length === 0 && !onlyMine
+        ? scheduleEvents
+        : scheduleEvents.filter((event) => {
+            if (selectedDept.length > 0) {
+              const deptName =
+                event?.raw?.employee?.department?.name ?? "";
+              if (!selectedDept.includes(deptName)) return false;
+            }
+            if (onlyMine && !event?.isMine) return false;
+            return true;
+          });
     const holidayEvents = mergeConsecutiveHolidayEvents(holidays);
 
     const includeLeave = showLeave;
     const includeOvertime = showOvertime;
+    const includeSchedule = showSchedule;
 
     return [
       ...(includeLeave ? leaveEvents : []),
       ...(includeOvertime ? overtimeEvents : []),
       ...(includeLeave ? holidayEvents : []),
+      ...(includeSchedule ? filteredSchedules : []),
     ];
-  }, [approvedLeaves, approvedOvertime, selectedDept, holidays, showLeave, showOvertime]);
+  }, [
+    approvedLeaves,
+    approvedOvertime,
+    scheduleItems,
+    selectedDept,
+    holidays,
+    showLeave,
+    showOvertime,
+    showSchedule,
+    onlyMine,
+    currentUser,
+  ]);
 
   const getEventsForDate = useCallback(
     (date) => {
@@ -750,12 +916,13 @@ export default function Schedule() {
     setDragStartX(null);
   };
 
-  const allChecked = showLeave && showOvertime;
+  const allChecked = showLeave && showOvertime && showSchedule;
 
   const toggleAll = () => {
     const next = !allChecked;
     setShowLeave(next);
     setShowOvertime(next);
+    setShowSchedule(next);
   };
 
   const FilterCheckbox = ({ label, checked, onPress }) => (
@@ -870,8 +1037,23 @@ export default function Schedule() {
                   }}
                 />
                 <Text style={{ fontSize: 12, color: "#6B7280" }}>
-                  연장근로
+                  연장 근로
                 </Text>
+              </View>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                <View
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 3,
+                    backgroundColor: "#FEF9C3",
+                    borderWidth: 1,
+                    borderColor: "#FACC15",
+                  }}
+                />
+                <Text style={{ fontSize: 12, color: "#6B7280" }}>작업 일정</Text>
               </View>
             </View>
           </View>
@@ -986,6 +1168,11 @@ export default function Schedule() {
             label="연장 근로"
             checked={showOvertime}
             onPress={() => setShowOvertime((v) => !v)}
+          />
+          <FilterCheckbox
+            label="작업 일정"
+            checked={showSchedule}
+            onPress={() => setShowSchedule((v) => !v)}
           />
         </View>
         </View>
@@ -1108,6 +1295,7 @@ export default function Schedule() {
               top: eventPopoverPos.y,
               left: eventPopoverPos.x,
               width: 360,
+              height: isSchedule ? 420 : undefined,
               backgroundColor: "#FFFFFF",
               borderRadius: 10,
               borderWidth: 1,
@@ -1160,38 +1348,161 @@ export default function Schedule() {
               );
             })()}
 
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
-                이름
-              </Text>
-              <Text style={{ fontSize: 15, color: "#0F172A" }}>
-                {displayName}
-              </Text>
-            </View>
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
-                종류
-              </Text>
-              <Text style={{ fontSize: 15, color: "#0F172A" }}>
-                {leaveType}
-              </Text>
-            </View>
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
-                기간
-              </Text>
-              <Text style={{ fontSize: 15, color: "#0F172A" }}>
-                {timeLabel}
-              </Text>
-            </View>
-            {!detail?.isHoliday && (
+            {isSchedule ? (
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 4 }}
+                showsVerticalScrollIndicator
+              >
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                    이름
+                  </Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                    {displayName}
+                  </Text>
+                </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      작업 번호
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.jobNumber || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      선명
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.vesselName || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      호선번호/고유번호
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleHullInfo}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      기간
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {timeLabel}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      고객사
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.customer || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      지역
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.region || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      작업
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.workType || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      종류
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.systemType || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      작업내용
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.jobDescription || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      비고
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.note || "-"}
+                    </Text>
+                  </View>
+              </ScrollView>
+            ) : (
               <View>
-                <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
-                  사유
-                </Text>
-                <Text style={{ fontSize: 15, color: "#0F172A" }}>
-                  {detail?.reason ?? "-"}
-                </Text>
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                    이름
+                  </Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                    {displayName}
+                  </Text>
+                </View>
+                <View style={{ marginBottom: 12 }}>
+                  <Text
+                    style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}
+                  >
+                    종류
+                  </Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                    {leaveType}
+                  </Text>
+                </View>
+                <View style={{ marginBottom: 12 }}>
+                  <Text
+                    style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}
+                  >
+                    기간
+                  </Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                    {timeLabel}
+                  </Text>
+                </View>
+                {!detail?.isHoliday && (
+                  <View>
+                    <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                      사유
+                    </Text>
+                    <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                      {detail?.reason ?? "-"}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1307,49 +1618,232 @@ export default function Schedule() {
                 <Text style={{ color: "#64748B", marginBottom: 6 }}>이름</Text>
                 <Text style={{ fontSize: 16 }}>{displayName}</Text>
               </View>
-              <View
-                style={{
-                  backgroundColor: "white",
-                  borderWidth: 1,
-                  borderColor: "#E2E8F0",
-                  borderRadius: 14,
-                  padding: 12,
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ color: "#64748B", marginBottom: 6 }}>종류</Text>
-                <Text style={{ fontSize: 15 }}>{leaveType}</Text>
-              </View>
-              <View
-                style={{
-                  backgroundColor: "white",
-                  borderWidth: 1,
-                  borderColor: "#E2E8F0",
-                  borderRadius: 14,
-                  padding: 12,
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ color: "#64748B", marginBottom: 6 }}>기간</Text>
-                <Text style={{ fontSize: 15 }}>{timeLabel}</Text>
-              </View>
+              {isSchedule ? (
+                <>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      작업 번호
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.jobNumber || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      선명
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.vesselName || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      호선번호/고유번호
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleHullInfo}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      기간
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {timeLabel}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      고객사
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.customer || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      지역
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.region || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      작업
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.workType || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      종류
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.systemType || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      작업내용
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.jobDescription || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      비고
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.note || "-"}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6 }}>
+                      종류
+                    </Text>
+                    <Text style={{ fontSize: 15 }}>{leaveType}</Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6 }}>
+                      기간
+                    </Text>
+                    <Text style={{ fontSize: 15 }}>{timeLabel}</Text>
+                  </View>
 
-              {!detail?.isHoliday && (
-                <View
-                  style={{
-                    backgroundColor: "white",
-                    borderWidth: 1,
-                    borderColor: "#E2E8F0",
-                    borderRadius: 14,
-                    padding: 12,
-                    marginBottom: 16,
-                  }}
-                >
-                  <Text style={{ color: "#64748B", marginBottom: 6 }}>사유</Text>
-                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
-                    {detail?.reason ?? "-"}
-                  </Text>
-                </View>
+                  {!detail?.isHoliday && (
+                    <View
+                      style={{
+                        backgroundColor: "white",
+                        borderWidth: 1,
+                        borderColor: "#E2E8F0",
+                        borderRadius: 14,
+                        padding: 12,
+                        marginBottom: 16,
+                      }}
+                    >
+                      <Text style={{ color: "#64748B", marginBottom: 6 }}>
+                        사유
+                      </Text>
+                      <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                        {detail?.reason ?? "-"}
+                      </Text>
+                    </View>
+                  )}
+                </>
               )}
 
               <TouchableOpacity

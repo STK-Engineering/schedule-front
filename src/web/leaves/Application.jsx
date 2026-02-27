@@ -62,10 +62,13 @@ export default function Application() {
 
         const res = await api.get("/leaves");
         const list = Array.isArray(res.data) ? res.data : [];
+        const approvedOnly = list.filter(
+          (item) => item?.approvalStatus === "승인"
+        );
 
         if (!mounted) return;
 
-        const mapped = list.map((e) => ({
+        const mapped = approvedOnly.map((e) => ({
           id: e.id, 
           name: e.employee?.name ?? "-",
           department: e.employee?.department?.name ?? "-",

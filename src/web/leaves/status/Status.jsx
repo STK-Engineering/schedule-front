@@ -445,9 +445,7 @@ function Item({ item, onDeleted, holidayDateSet, listType }) {
                         style={isCurrent ? styles.badgeTextCurrent : styles.badgeText}
                       >
                         {name}
-                        {isCurrent ? (
-                          <Text style={styles.badgeTextCurrentTag}> (현재)</Text>
-                        ) : null}
+                        {null}
                         {index < approverNames.length - 1 ? (
                           <Text style={styles.badgeTextSeparator}> &gt; </Text>
                         ) : null}
@@ -584,12 +582,11 @@ const styles = {
   badgeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   badgeText: { fontSize: 12, fontWeight: "700" },
   badgeTextCurrent: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "800",
     color: "#0F172A",
   },
   badgeTextSeparator: { fontSize: 12, fontWeight: "700", color: "#475569" },
-  badgeTextCurrentTag: { fontSize: 11, fontWeight: "700", color: "#0F172A" },
 
   pdfBtn: {
     flexDirection: "row",

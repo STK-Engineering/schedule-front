@@ -18,15 +18,16 @@ import PageLayout from "../../components/PageLayout";
 const columns = [
   { key: "jobNumber", title: "작업번호", width: "8%", sortable: true },
   { key: "vesselName", title: "선박명", width: "8%", sortable: true },
-  { key: "hullNo", title: "호선", width: "6%", sortable: true },
-  { key: "region", title: "지역", width: "10%", sortable: true },
+  { key: "hullNo", title: "호선번호", width: "6%", sortable: true },
+  { key: "imoNumber", title: "고유번호", width: "8%", sortable: true },
+  { key: "region", title: "지역", width: "5%", sortable: true },
   { key: "dateRange", title: "기간", width: "12%", sortable: true },
-  { key: "workType", title: "작업", width: "8%", sortable: true },
+  { key: "workType", title: "작업", width: "5%", sortable: true },
   { key: "systemType", title: "종류", width: "6%", sortable: true },
-  { key: "engineers", title: "엔지니어", width: "14%", sortable: true },
+  { key: "engineers", title: "엔지니어", width: "12%", sortable: true },
   { key: "note", title: "비고", width: "12%", sortable: true },
   { key: "jobDescription", title: "작업내용", width: "8%", sortable: true },
-  { key: "action", title: "", width: "8%", sortable: false },
+  { key: "action", title: "", width: "10%", sortable: false },
 ];
 
 export default function Application() {
@@ -39,6 +40,31 @@ export default function Application() {
   const [nameQuery, setNameQuery] = useState("");
   const [year, setYear] = useState(String(now.getFullYear()));
   const [month, setMonth] = useState(String(now.getMonth() + 1));
+
+  const confirmDelete = () => {
+    if (typeof window !== "undefined" && typeof window.confirm === "function") {
+      return window.confirm("일정을 삭제하시겠습니까?");
+    }
+    return true;
+  };
+
+  const handleDelete = async (item) => {
+    const targetId = item?.source?.id ?? null;
+    if (!targetId) {
+      setError("삭제할 일정 ID를 찾지 못했습니다.");
+      return;
+    }
+    if (!confirmDelete()) return;
+
+    try {
+      setError("");
+      await api.delete(`/engineer-schedule/${targetId}`);
+      setData((prev) => prev.filter((row) => row?.source?.id !== targetId));
+    } catch (e) {
+      console.log("delete schedule error:", e?.response?.status, e?.response?.data);
+      setError("일정 삭제에 실패했습니다.");
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -75,6 +101,7 @@ export default function Application() {
               source: item,
               jobNumber: item.jobNumber ?? "-",
               vesselName: item.vesselName ?? "-",
+              imoNumber: item.imoNumber ?? "-",
               hullNo: item.hullNo ?? "-",
               region: item.region ?? "-",
               dateRange: "-",
@@ -103,6 +130,7 @@ export default function Application() {
               scheduleIndex: index,
               jobNumber: item.jobNumber ?? "-",
               vesselName: item.vesselName ?? "-",
+              imoNumber: item.imoNumber ?? "-",
               hullNo: item.hullNo ?? "-",
               region: item.region ?? "-",
               dateRange:
@@ -189,6 +217,7 @@ export default function Application() {
           item?.engineers,
           item?.jobNumber,
           item?.vesselName,
+          item?.imoNumber,
           item?.hullNo,
           item?.region,
         ].some((field) =>
@@ -205,7 +234,10 @@ export default function Application() {
         {columns.map((col) => {
           if (col.key === "action") {
             return (
-              <View key={col.key} style={[styles.cell, { width: col.width }]}>
+              <View
+                key={col.key}
+                style={[styles.cell, styles.actionCell, { width: col.width }]}
+              >
                 <TouchableOpacity
                   style={styles.detailButton}
                   onPress={() => {
@@ -214,6 +246,12 @@ export default function Application() {
                 >
                   <Text style={styles.detailButtonText}>보기</Text>
                   <Image source={showIcon} style={styles.detailButtonIcon} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDelete(item)}
+                >
+                  <Text style={styles.deleteButtonText}>삭제</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -448,6 +486,11 @@ const styles = StyleSheet.create({
   headerText: { fontWeight: "600" },
   sortIcon: { color: "#64748B", fontWeight: "600" },
   cellText: { color: "#333" },
+  actionCell: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   detailButton: {
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -461,5 +504,14 @@ const styles = StyleSheet.create({
   },
   detailButtonText: { fontSize: 12, color: "#0F172A" },
   detailButtonIcon: { width: 14, height: 14, resizeMode: "contain" },
+  deleteButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
+  },
+  deleteButtonText: { fontSize: 12, color: "#64748B", fontWeight: "600" },
 
 });

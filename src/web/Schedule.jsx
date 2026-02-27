@@ -436,7 +436,7 @@ export default function Schedule() {
     "Sales&Marketing",
     "ENGINEERING",
     "Coordinator",
-    "Logistic&Warehouse",
+    "Logistic&warehouse",
     "IT/ISO",
   ];
 

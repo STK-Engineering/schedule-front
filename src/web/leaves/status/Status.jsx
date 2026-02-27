@@ -151,14 +151,33 @@ function displayLeaveType(type) {
   return "경조사";
 }
 
-function getYearFromDate(value) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.getFullYear();
+function normalizeApproverName(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    return (
+      value?.name ??
+      value?.employeeName ??
+      value?.employee?.name ??
+      ""
+    ).toString().trim();
   }
-  const match = String(value).match(/(\d{4})/);
-  return match ? Number(match[1]) : null;
+  return String(value).trim();
+}
+
+function normalizeApproverNames(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeApproverName(item))
+      .filter((name) => name.length > 0);
+  }
+  const str = String(value).trim();
+  if (!str) return [];
+  return str
+    .split(/[>,]/)
+    .map((name) => name.trim())
+    .filter(Boolean);
 }
 
 export default function Status() {
@@ -191,6 +210,9 @@ export default function Status() {
         reason: e.reason ?? "",
         etc: e.etc ?? "",
         status: e.approvalStatusDisplay ?? "",
+        approvalStatus: e.approvalStatus ?? e.approvalStatusDisplay ?? "",
+        approverNames: e.approverNames ?? [],
+        currentApprover: e.currentApprover ?? "",
 
         rejectionReason: e.rejectionReason ?? "—",
         file: pdf,
@@ -274,6 +296,7 @@ export default function Status() {
             key={item.id}
             item={item}
             holidayDateSet={holidayDateSet}
+            listType="waiting"
             onDeleted={() => fetchLeaves(undefined, { silent: true })}
           />
         ))}
@@ -289,6 +312,7 @@ export default function Status() {
             key={item.id}
             item={item}
             holidayDateSet={holidayDateSet}
+            listType="done"
             onDeleted={() => fetchLeaves(undefined, { silent: true })}
           />
         ))}
@@ -316,15 +340,23 @@ function Section({ title, count, emptyText, children }) {
   );
 }
 
-function Item({ item, onDeleted, holidayDateSet }) {
+function Item({ item, onDeleted, holidayDateSet, listType }) {
   const navigation = useNavigation();
   const { bump } = useContext(LeaveBalanceContext);
 
-  const statusTheme = STATUS_STYLE[item.status] || STATUS_STYLE["대기"];
+  const isWaiting = listType === "waiting";
+  const isDone = listType === "done";
+  const statusThemeKey = item.status || item.approvalStatus || "대기";
+  const statusTheme = STATUS_STYLE[statusThemeKey] || STATUS_STYLE["대기"];
+  const statusLabel = isDone
+    ? item.approvalStatus || item.status || "-"
+    : item.status || "-";
+  const approverNames = normalizeApproverNames(item.approverNames);
+  const currentApprover = normalizeApproverName(item.currentApprover);
 
-  const hidePdf = item.status !== "승인";
-  const hideEdit = item.type === "경조사" || item.status === "취소";
-  const hideCancel = item.status === "취소" ||item.status === "반려";
+  const hidePdf = item.approvalStatus !== "승인";
+  const hideEdit = item.type === "경조사" || item.approvalStatus === "취소";
+  const hideCancel = item.approvalStatus === "취소" || item.approvalStatus === "반려";
 
   const downloadPdf = async () => {
     try {
@@ -401,9 +433,33 @@ function Item({ item, onDeleted, holidayDateSet }) {
           <View
             style={[styles.badgeDot, { backgroundColor: statusTheme.dot }]}
           />
-          <Text style={[styles.badgeText, { color: statusTheme.text }]}>
-            {item.status}
-          </Text>
+          {isWaiting ? (
+            <Text style={[styles.badgeText, { color: statusTheme.text }]}>
+              {approverNames.length === 0
+                ? "-"
+                : approverNames.map((name, index) => {
+                    const isCurrent = name === currentApprover;
+                    return (
+                      <Text
+                        key={`${name}-${index}`}
+                        style={isCurrent ? styles.badgeTextCurrent : styles.badgeText}
+                      >
+                        {name}
+                        {isCurrent ? (
+                          <Text style={styles.badgeTextCurrentTag}> (현재)</Text>
+                        ) : null}
+                        {index < approverNames.length - 1 ? (
+                          <Text style={styles.badgeTextSeparator}> &gt; </Text>
+                        ) : null}
+                      </Text>
+                    );
+                  })}
+            </Text>
+          ) : (
+            <Text style={[styles.badgeText, { color: statusTheme.text }]}>
+              {statusLabel}
+            </Text>
+          )}
         </View>
 
         <View style={{ flexDirection: "row", gap: 8 }}>
@@ -513,18 +569,27 @@ const styles = {
   itemSub: { fontSize: 13, color: "#475569", marginBottom: 6 },
   itemMeta: { fontSize: 13, color: "#64748B" },
   itemMetaStrong: { fontWeight: "800", color: "#0F172A" },
-
   itemRight: { alignItems: "flex-end", gap: 10 },
 
   badge: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
-    height: 28,
+    paddingVertical: 6,
     borderRadius: 14,
+    flexWrap: "wrap",
+    maxWidth: 260,
+    alignSelf: "flex-end",
   },
   badgeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  badgeText: { fontSize: 13, fontWeight: "800" },
+  badgeText: { fontSize: 12, fontWeight: "700" },
+  badgeTextCurrent: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  badgeTextSeparator: { fontSize: 12, fontWeight: "700", color: "#475569" },
+  badgeTextCurrentTag: { fontSize: 11, fontWeight: "700", color: "#0F172A" },
 
   pdfBtn: {
     flexDirection: "row",

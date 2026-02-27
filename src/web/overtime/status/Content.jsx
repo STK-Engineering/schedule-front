@@ -35,12 +35,13 @@ export default function StatusDetail({ route }) {
     endTime = "",
     imageUrl = "",
     status = "",
+    approvalStatus = "",
     rejectionReason = "—",
   } = params;
 
-  const isPending = status === "대기";
+  const displayStatus = approvalStatus || status || "대기";
 
-  const statusTheme = STATUS_STYLE[status] || STATUS_STYLE["대기"];
+  const statusTheme = STATUS_STYLE[displayStatus] || STATUS_STYLE["대기"];
   const timeRange =
     startTime || endTime ? `${startTime || "-"} ~ ${endTime || "-"}` : "-";
   const hasImage = Boolean(imageUrl);
@@ -74,7 +75,7 @@ export default function StatusDetail({ route }) {
             <View style={[styles.statusPill, { backgroundColor: statusTheme.bg }]}>
               <View style={[styles.statusDot, { backgroundColor: statusTheme.dot }]} />
               <Text style={[styles.statusText, { color: statusTheme.text }]}>
-                {status || "대기"}
+                {displayStatus}
               </Text>
             </View>
           </View>
@@ -82,7 +83,7 @@ export default function StatusDetail({ route }) {
           <View style={styles.sectionDivider} />
 
           <View style={styles.table}>
-            <InfoRow label="상태" value={status || "대기"} />
+            <InfoRow label="상태" value={displayStatus} />
             <InfoRow label="작업번호" value={jobNumber || "-"} />
             <InfoRow label="호선명" value={vesselName || "-"} />
             <InfoRow label="호선번호" value={hullNo || "-"} />
@@ -120,11 +121,6 @@ export default function StatusDetail({ route }) {
               <Text style={styles.sectionTitle}>거절 사유</Text>
               <Text style={styles.sectionSub}>반려 시 사유가 표시됩니다.</Text>
             </View>
-            {isPending && (
-              <View style={styles.pendingPill}>
-                <Text style={styles.pendingText}>대기중</Text>
-              </View>
-            )}
           </View>
           <View style={styles.sectionDivider} />
           <Text style={styles.messageText}>
@@ -310,15 +306,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  pendingPill: {
-    paddingHorizontal: 10,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#FEF3C7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pendingText: { fontSize: 12, fontWeight: "600", color: "#B45309" },
   messageText: { fontSize: 14, color: "#DC2626", lineHeight: 20 },
   backButton: {
     alignSelf: "center",

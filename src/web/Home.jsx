@@ -36,6 +36,44 @@ const LEAVE_TYPE_STYLES = {
   출산: "#6f6e6bff",
 };
 
+const CATEGORY_THEME = {
+  연차: {
+    bg: "#F8FAFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+  오전반차: {
+    bg: "#F8FAFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+  오후반차: {
+    bg: "#F8FAFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+  경조사: {
+    bg: "#F8FAFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+  기타: {
+    bg: "#F8FAFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+};
+
 const toDateKey = (value) => {
   if (!value) return null;
   const d = new Date(value);
@@ -225,31 +263,6 @@ export default function Home() {
       .slice(0, 5);
   }, [leaveSummary]);
 
-  const calendarMarks = useMemo(() => {
-    const map = new Map();
-    for (const item of calendarLeaves) {
-      const keys = getDateKeysInRange(item.startDate, item.endDate);
-      const color = LEAVE_TYPE_STYLES[item.leaveType] ?? "#94A3B8";
-      for (const key of keys) {
-        const prev = map.get(key) ?? [];
-        prev.push(color);
-        map.set(key, prev);
-      }
-    }
-    return map;
-  }, [calendarLeaves]);
-
-  const openDayEvents = (dateKey) => {
-    if (!dateKey) return;
-    const list = calendarLeaves.filter((item) => {
-      const keys = getDateKeysInRange(item.startDate, item.endDate);
-      return keys.includes(dateKey);
-    });
-    setDayEventsDateKey(dateKey);
-    setDayEvents(list);
-    setDayEventsOpen(true);
-  };
-
   const closeDayEvents = () => {
     setDayEventsOpen(false);
     setDayEvents([]);
@@ -399,36 +412,76 @@ export default function Home() {
             </View>
           </View>
           <View style={styles.categoryButtons}>
-            {[
-              ["연차", "오전반차", "오후반차"],
-              ["경조사", "기타", null],
-            ].map((row, rowIndex) => (
-              <View key={`row-${rowIndex}`} style={styles.categoryRow}>
-                {row.map((type, index) =>
-                  type ? (
-                    <View key={type} style={styles.categoryButtonWrap}>
-                      <TouchableOpacity
-                        style={styles.categoryButton}
-                        onPress={() =>
-                          navigation.navigate("LeaveForm", {
-                            preselectLeaveType: type,
-                          })
-                        }
-                      >
-                        <Text style={styles.categoryButtonText}>{type}</Text>
-                        <Text style={styles.categoryButtonSubText}>
-                          사용일수 {leaveTypeUsageDays(type)}일
+            {(() => {
+              const renderCategoryButton = (type, { size = "md" } = {}) => {
+                const theme = CATEGORY_THEME[type] ?? CATEGORY_THEME.기타;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryButton,
+                      size === "lg" && styles.categoryButtonLarge,
+                      { backgroundColor: theme.bg, borderColor: theme.border },
+                    ]}
+                    onPress={() =>
+                      navigation.navigate("LeaveForm", {
+                        preselectLeaveType: type,
+                      })
+                    }
+                  >
+                    <View style={styles.categoryButtonRow}>
+                      <View style={styles.categoryButtonLabel}>
+                        <Text
+                          style={[
+                            styles.categoryButtonText,
+                            size === "lg" && styles.categoryButtonTextLarge,
+                            { color: theme.text },
+                          ]}
+                        >
+                          {type}
                         </Text>
-                      </TouchableOpacity>
+                      </View>
+                      <Text
+                        style={[
+                          styles.categoryButtonArrow,
+                          { color: theme.accent },
+                        ]}
+                      >
+                        ›
+                      </Text>
                     </View>
-                  ) : (
-                    <View key={`placeholder-${rowIndex}-${index}`} style={styles.categoryButtonWrap}>
+                  </TouchableOpacity>
+                );
+              };
+
+              return (
+                <>
+                  <View style={styles.categoryRow}>
+                    <View style={styles.categoryButtonWrap}>
+                      {renderCategoryButton("연차")}
+                    </View>
+                    <View style={styles.categoryButtonWrap}>
+                      {renderCategoryButton("오전반차")}
+                    </View>
+                  </View>
+                  <View style={styles.categoryRow}>
+                    <View style={styles.categoryButtonWrap}>
+                      {renderCategoryButton("오후반차")}
+                    </View>
+                    <View style={styles.categoryButtonWrap}>
+                      {renderCategoryButton("경조사")}
+                    </View>
+                  </View>
+                  <View style={styles.categoryRow}>
+                    <View style={styles.categoryButtonWrap}>
+                      {renderCategoryButton("기타")}
+                    </View>
+                    <View style={styles.categoryButtonWrap}>
                       <View style={styles.categoryButtonPlaceholder} />
                     </View>
-                  ),
-                )}
-              </View>
-            ))}
+                  </View>
+                </>
+              );
+            })()}
           </View>
         </View>
 
@@ -677,32 +730,56 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
   },
+  categoryButtonWrapFull: {
+    width: "100%",
+  },
   categoryButton: {
     flex: 1,
     width: "100%",
-    minHeight: 72,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    minHeight: 76,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-    alignItems: "center",
+    alignItems: "stretch",
     justifyContent: "center",
-    gap: 6,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+    position: "relative",
+    overflow: "hidden",
+  },
+  categoryButtonLarge: {
+    minHeight: 96,
+    paddingVertical: 18,
+  },
+  categoryButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  categoryButtonLabel: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   categoryButtonText: {
-    fontSize: 18,
-    color: "#0F172A",
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
   },
-  categoryButtonSubText: {
-    fontSize: 14,
-    color: "#64748B",
+  categoryButtonTextLarge: {
+    fontSize: 18,
+  },
+  categoryButtonArrow: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: -1,
   },
   categoryButtonPlaceholder: {
     flex: 1,
-    minHeight: 72,
+    minHeight: 76,
     width: "100%",
   },
   balanceNumbers: {

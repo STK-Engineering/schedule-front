@@ -1012,7 +1012,7 @@ export default function Schedule() {
           mode={mode}
           date={currentDate}
           swipeEnabled={false}
-          maxVisibleEventCount={2}
+          maxVisibleEventCount={4}
           moreLabel="+ {moreCount}개의 일정 더보기"
           theme={{
             palette: { moreLabel: "#94A3B8" },

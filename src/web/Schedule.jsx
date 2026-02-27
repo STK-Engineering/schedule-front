@@ -29,7 +29,7 @@ function leaveTypeToTimeRange(leaveType) {
 function approvalSuffix(item) {
   const status = item?.approvalStatusDisplay ?? item?.approvalStatus ?? "";
   const text = String(status);
-  if (text.includes("대기")) return " (결재 대기 중)";
+  if (text.includes("대기")) return "(결재 대기)";
   return "";
 }
 
@@ -59,7 +59,8 @@ function leaveToEvents(item, holidayDateSet) {
 
   const { startH, startM, endH, endM } = leaveTypeToTimeRange(leaveType);
 
-  const title = `${empName} - ${leaveType}${approvalSuffix(item)}`;
+  const approvalTag = approvalSuffix(item);
+  const title = `${approvalTag ? `${approvalTag} ` : ""}${empName} - ${leaveType}`;
   const startDate = normalizeHolidayDate(item?.startDate);
   const endDate = normalizeHolidayDate(item?.endDate) || startDate;
   if (!startDate || !endDate) return [];
@@ -142,7 +143,8 @@ function overtimeToEvent(item) {
   const start = toDate(requestDate, startParts.h, startParts.m);
   const end = toDate(requestDate, endParts.h, endParts.m);
 
-  const title = `${empName} - 연장근로${approvalSuffix(item)}`;
+  const approvalTag = approvalSuffix(item);
+  const title = `${approvalTag ? `${approvalTag} ` : ""}${empName} - 연장근로`;
 
   return {
     title,

@@ -152,6 +152,7 @@ export default function Home() {
           reason: e.reason ?? "",
           etc: e.etc ?? "",
           status: e.approvalStatusDisplay ?? "",
+          approvalStatus: e.approvalStatus ?? e.approvalStatusDisplay ?? "",
           rejectionReason: e.rejectionReason ?? "—",
         });
         setLeaveSummary({
@@ -465,7 +466,8 @@ export default function Home() {
               <Text style={styles.mutedText}>최근 신청 내역이 없습니다.</Text>
             ) : (
               recentRequests.map((item) => {
-                const theme = STATUS_STYLE[item.status] || STATUS_STYLE["대기"];
+                const displayStatus = item.approvalStatus || item.status || "-";
+                const theme = STATUS_STYLE[displayStatus] || STATUS_STYLE["대기"];
                 return (
                   <TouchableOpacity
                     key={item.id}
@@ -489,7 +491,7 @@ export default function Home() {
                       ]}
                     >
                       <Text style={[styles.statusBadgeText, { color: theme.text }]}>
-                        {item.status || "-"}
+                        {displayStatus}
                       </Text>
                     </View>
                   </TouchableOpacity>

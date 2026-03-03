@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import pdf from "../../../../assets/img/pdf.png";
@@ -187,6 +188,7 @@ export default function Status() {
 }
 
 function Section({ title, count, emptyText, children }) {
+  const shouldScroll = count > 3;
   return (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeader}>
@@ -198,6 +200,10 @@ function Section({ title, count, emptyText, children }) {
 
       {count === 0 ? (
         <Text style={styles.emptyText}>{emptyText}</Text>
+      ) : shouldScroll ? (
+        <ScrollView style={styles.sectionScroll} showsVerticalScrollIndicator>
+          {children}
+        </ScrollView>
       ) : (
         children
       )}
@@ -407,6 +413,9 @@ const styles = {
   countText: { fontWeight: "700", color: "#334155" },
 
   emptyText: { textAlign: "center", color: "#94A3B8", paddingVertical: 18 },
+  sectionScroll: {
+    maxHeight: 360,
+  },
 
   itemCard: {
     backgroundColor: "#FFFFFF",

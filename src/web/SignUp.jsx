@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import api from "../api/api";
@@ -13,6 +14,8 @@ import AuthLayout from "./layout/AuthLayout";
 
 export default function SignUp() {
   const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const isSmall = width < 520;
   const [email, setEmail] = useState("");
   const [authCode, setAuthCode] = useState("");
   const [password, setPassword] = useState("");
@@ -77,16 +80,20 @@ export default function SignUp() {
   return (
     <AuthLayout>
       <View style={styles.cardAccent} />
-      <Text style={styles.title}>회원가입</Text>
-      <Text style={styles.subtitle}>
+      <Text style={[styles.title, isSmall && styles.titleSmall]}>회원가입</Text>
+      <Text style={[styles.subtitle, isSmall && styles.subtitleSmall]}>
         이메일 인증 후 계정을 생성할 수 있어요.
       </Text>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>이메일</Text>
-        <View style={styles.inlineRow}>
+      <View style={[styles.form, isSmall && styles.formSmall]}>
+        <Text style={[styles.label, isSmall && styles.labelSmall]}>이메일</Text>
+        <View style={[styles.inlineRow, isSmall && styles.inlineRowSmall]}>
           <TextInput
-            style={[styles.input, styles.flexInput]}
+            style={[
+              styles.input,
+              styles.flexInput,
+              isSmall && styles.inputSmall,
+            ]}
             placeholder="이메일 주소를 입력해주세요."
             placeholderTextColor="#9CA3AF"
             value={email}
@@ -94,25 +101,36 @@ export default function SignUp() {
             autoCapitalize="none"
           />
           <TouchableOpacity
-            style={styles.inlineButton}
+            style={[styles.inlineButton, isSmall && styles.inlineButtonSmall]}
             onPress={handleSendEmail}
           >
-            <Text style={styles.inlineButtonText}>인증번호 받기</Text>
+            <Text
+              style={[
+                styles.inlineButtonText,
+                isSmall && styles.inlineButtonTextSmall,
+              ]}
+            >
+              인증번호 받기
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>인증번호</Text>
+        <Text style={[styles.label, isSmall && styles.labelSmall]}>
+          인증번호
+        </Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, isSmall && styles.inputSmall]}
           placeholder="인증번호를 입력해주세요."
           placeholderTextColor="#9CA3AF"
           value={authCode}
           onChangeText={(text) => setAuthCode(text)}
         />
 
-        <Text style={styles.label}>비밀번호</Text>
+        <Text style={[styles.label, isSmall && styles.labelSmall]}>
+          비밀번호
+        </Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, isSmall && styles.inputSmall]}
           placeholder="비밀번호를 입력해주세요."
           placeholderTextColor="#9CA3AF"
           secureTextEntry
@@ -120,15 +138,29 @@ export default function SignUp() {
           onChangeText={(text) => setPassword(text)}
         />
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp}>
-          <Text style={styles.primaryButtonText}>회원가입</Text>
+        <TouchableOpacity
+          style={[styles.primaryButton, isSmall && styles.primaryButtonSmall]}
+          onPress={handleSignUp}
+        >
+          <Text
+            style={[
+              styles.primaryButtonText,
+              isSmall && styles.primaryButtonTextSmall,
+            ]}
+          >
+            회원가입
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.footerRow}>
-        <Text style={styles.footerText}>이미 계정이 있으신가요?</Text>
+      <View style={[styles.footerRow, isSmall && styles.footerRowSmall]}>
+        <Text style={[styles.footerText, isSmall && styles.footerTextSmall]}>
+          이미 계정이 있으신가요?
+        </Text>
         <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-          <Text style={styles.footerLink}>로그인</Text>
+          <Text style={[styles.footerLink, isSmall && styles.footerLinkSmall]}>
+            로그인
+          </Text>
         </TouchableOpacity>
       </View>
     </AuthLayout>
@@ -151,19 +183,31 @@ const styles = StyleSheet.create({
     color: "#1F2933",
     fontFamily: FONT_TITLE,
   },
+  titleSmall: {
+    fontSize: 20,
+  },
   subtitle: {
     fontSize: 13,
     color: "#6B7280",
     fontFamily: FONT_BODY,
   },
+  subtitleSmall: {
+    fontSize: 12,
+  },
   form: {
     gap: 7,
+  },
+  formSmall: {
+    gap: 6,
   },
   label: {
     fontSize: 12,
     fontWeight: "600",
     color: "#1F2933",
     fontFamily: FONT_BODY,
+  },
+  labelSmall: {
+    fontSize: 11,
   },
   input: {
     width: "100%",
@@ -179,6 +223,10 @@ const styles = StyleSheet.create({
     outlineWidth: 0,
     fontFamily: FONT_BODY,
   },
+  inputSmall: {
+    paddingVertical: 10,
+    fontSize: 13,
+  },
   flexInput: {
     flex: 1,
     minWidth: 180,
@@ -189,17 +237,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexWrap: "wrap",
   },
+  inlineRowSmall: {
+    gap: 8,
+  },
   inlineButton: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     backgroundColor: "#121D6D",
   },
+  inlineButtonSmall: {
+    width: "100%",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
   inlineButtonText: {
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "700",
     fontFamily: FONT_BODY,
+  },
+  inlineButtonTextSmall: {
+    fontSize: 12,
   },
   primaryButton: {
     backgroundColor: "#121D6D",
@@ -208,11 +267,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 6,
   },
+  primaryButtonSmall: {
+    paddingVertical: 12,
+  },
   primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "700",
     fontFamily: FONT_BODY,
+  },
+  primaryButtonTextSmall: {
+    fontSize: 14,
   },
   footerRow: {
     marginTop: 6,
@@ -221,15 +286,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
+  footerRowSmall: {
+    flexWrap: "wrap",
+    gap: 6,
+  },
   footerText: {
     fontSize: 13,
     color: "#6B7280",
     fontFamily: FONT_BODY,
+  },
+  footerTextSmall: {
+    fontSize: 12,
   },
   footerLink: {
     fontSize: 13,
     color: "#121D6D",
     fontWeight: "700",
     fontFamily: FONT_BODY,
+  },
+  footerLinkSmall: {
+    fontSize: 12,
   },
 });

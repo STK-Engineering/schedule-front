@@ -4,6 +4,7 @@ import {
   Text,
   TouchableOpacity,
   Modal,
+  ScrollView,
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
@@ -125,6 +126,7 @@ export default function Home() {
   const navigation = useNavigation();
   const { width, height } = useWindowDimensions();
   const isNarrow = width < 1024;
+  const isMobile = width < 800;
   const cardMinHeight = Math.max(620, Math.floor(height * 0.72));
   const { version } = useContext(LeaveBalanceContext);
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -262,6 +264,9 @@ export default function Home() {
       .sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)))
       .slice(0, 5);
   }, [leaveSummary]);
+  const recentVisibleCount = isMobile ? 3 : 5;
+  const shouldScrollRecent = recentRequests.length > recentVisibleCount;
+  const recentScrollMaxHeight = 64 * recentVisibleCount;
 
   const closeDayEvents = () => {
     setDayEventsOpen(false);
@@ -329,7 +334,7 @@ export default function Home() {
   return (
     <PageLayout
       breadcrumb={[{ label: "홈" }]}
-      contentStyle={styles.pageContent}
+      contentStyle={[styles.pageContent, isMobile && styles.pageContentMobile]}
       pageStyle={styles.pageBackground}
     >
       <View style={styles.headerRow}>
@@ -342,11 +347,19 @@ export default function Home() {
         </View>
       </View>
       
-           <View style={[styles.gridRow, isNarrow && styles.gridRowStack]}>
+           <View
+        style={[
+          styles.gridRow,
+          isNarrow && styles.gridRowStack,
+          isMobile && styles.gridRowStackMobile,
+        ]}
+      >
         <View
           style={[
             styles.card,
             styles.balanceCard,
+            !isNarrow && styles.cardStretch,
+            isMobile && styles.cardMobile,
             !isNarrow && { minHeight: cardMinHeight },
           ]}
         >
@@ -387,12 +400,23 @@ export default function Home() {
             </Text>
           </View>
 
-          <View style={[styles.quickCard, { marginTop: 28 }]}>
+          <View
+            style={[
+              styles.quickCard,
+              { marginTop: 28 },
+              isMobile && styles.quickCardMobile,
+            ]}
+          >
             <Text style={styles.quickCardTitle}>바로가기</Text>
             <Text style={styles.quickCardSubtitle}>
               자주 쓰는 신청서로 빠르게 이동하세요.
             </Text>
-            <View style={styles.quickCardButtons}>
+            <View
+              style={[
+                styles.quickCardButtons,
+                isMobile && styles.quickCardButtonsMobile,
+              ]}
+            >
               <TouchableOpacity
                 style={styles.quickCardButtonPrimary}
                 onPress={() => navigation.navigate("LeaveForm")}
@@ -411,78 +435,80 @@ export default function Home() {
               </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.categoryButtons}>
-            {(() => {
-              const renderCategoryButton = (type, { size = "md" } = {}) => {
-                const theme = CATEGORY_THEME[type] ?? CATEGORY_THEME.기타;
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.categoryButton,
-                      size === "lg" && styles.categoryButtonLarge,
-                      { backgroundColor: theme.bg, borderColor: theme.border },
-                    ]}
-                    onPress={() =>
-                      navigation.navigate("LeaveForm", {
-                        preselectLeaveType: type,
-                      })
-                    }
-                  >
-                    <View style={styles.categoryButtonRow}>
-                      <View style={styles.categoryButtonLabel}>
+          {!isMobile ? (
+            <View style={styles.categoryButtons}>
+              {(() => {
+                const renderCategoryButton = (type, { size = "md" } = {}) => {
+                  const theme = CATEGORY_THEME[type] ?? CATEGORY_THEME.기타;
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.categoryButton,
+                        size === "lg" && styles.categoryButtonLarge,
+                        { backgroundColor: theme.bg, borderColor: theme.border },
+                      ]}
+                      onPress={() =>
+                        navigation.navigate("LeaveForm", {
+                          preselectLeaveType: type,
+                        })
+                      }
+                    >
+                      <View style={styles.categoryButtonRow}>
+                        <View style={styles.categoryButtonLabel}>
+                          <Text
+                            style={[
+                              styles.categoryButtonText,
+                              size === "lg" && styles.categoryButtonTextLarge,
+                              { color: theme.text },
+                            ]}
+                          >
+                            {type}
+                          </Text>
+                        </View>
                         <Text
                           style={[
-                            styles.categoryButtonText,
-                            size === "lg" && styles.categoryButtonTextLarge,
-                            { color: theme.text },
+                            styles.categoryButtonArrow,
+                            { color: theme.accent },
                           ]}
                         >
-                          {type}
+                          ›
                         </Text>
                       </View>
-                      <Text
-                        style={[
-                          styles.categoryButtonArrow,
-                          { color: theme.accent },
-                        ]}
-                      >
-                        ›
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              };
+                    </TouchableOpacity>
+                  );
+                };
 
-              return (
-                <>
-                  <View style={styles.categoryRow}>
-                    <View style={styles.categoryButtonWrap}>
-                      {renderCategoryButton("연차")}
+                return (
+                  <>
+                    <View style={styles.categoryRow}>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("연차")}
+                      </View>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("오전반차")}
+                      </View>
                     </View>
-                    <View style={styles.categoryButtonWrap}>
-                      {renderCategoryButton("오전반차")}
+                    <View style={styles.categoryRow}>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("오후반차")}
+                      </View>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("경조사")}
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.categoryRow}>
-                    <View style={styles.categoryButtonWrap}>
-                      {renderCategoryButton("오후반차")}
+                    <View style={styles.categoryRow}>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("기타")}
+                      </View>
+                      <View style={styles.categoryButtonWrap}>
+                        <View style={styles.categoryButtonPlaceholder} />
+                      </View>
                     </View>
-                    <View style={styles.categoryButtonWrap}>
-                      {renderCategoryButton("경조사")}
-                    </View>
-                  </View>
-                  <View style={styles.categoryRow}>
-                    <View style={styles.categoryButtonWrap}>
-                      {renderCategoryButton("기타")}
-                    </View>
-                    <View style={styles.categoryButtonWrap}>
-                      <View style={styles.categoryButtonPlaceholder} />
-                    </View>
-                  </View>
-                </>
-              );
-            })()}
-          </View>
+                  </>
+                );
+              })()}
+            </View>
+          ) : null}
         </View>
 
         
@@ -491,25 +517,31 @@ export default function Home() {
           style={[
             styles.card,
             styles.statusCard,
+            !isNarrow && styles.cardStretch,
+            isMobile && styles.cardMobile,
             !isNarrow && { minHeight: cardMinHeight },
           ]}
         >
           <Text style={styles.cardTitle}>연차 진행 상황</Text>
-          <Text style={styles.cardCaption}>요청 현황 요약</Text>
-          <View style={styles.statusRow}>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusLabel}>승인 대기</Text>
-              <Text style={styles.statusValue}>
-                {loading ? "-" : leaveSummary.waiting.length}
-              </Text>
+          {!isMobile ? (
+            <Text style={styles.cardCaption}>요청 현황 요약</Text>
+          ) : null}
+          {!isMobile ? (
+            <View style={styles.statusRow}>
+              <View style={styles.statusPill}>
+                <Text style={styles.statusLabel}>승인 대기</Text>
+                <Text style={styles.statusValue}>
+                  {loading ? "-" : leaveSummary.waiting.length}
+                </Text>
+              </View>
+              <View style={styles.statusPill}>
+                <Text style={styles.statusLabel}>처리 완료</Text>
+                <Text style={styles.statusValue}>
+                  {loading ? "-" : leaveSummary.done.length}
+                </Text>
+              </View>
             </View>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusLabel}>처리 완료</Text>
-              <Text style={styles.statusValue}>
-                {loading ? "-" : leaveSummary.done.length}
-              </Text>
-            </View>
-          </View>
+          ) : null}
 
           <View style={styles.recentBlock}>
             <Text style={styles.recentTitle}>최근 신청</Text>
@@ -518,38 +550,58 @@ export default function Home() {
             ) : recentRequests.length === 0 ? (
               <Text style={styles.mutedText}>최근 신청 내역이 없습니다.</Text>
             ) : (
-              recentRequests.map((item) => {
-                const displayStatus = item.approvalStatus || item.status || "-";
-                const theme = STATUS_STYLE[displayStatus] || STATUS_STYLE["대기"];
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.recentRow}
-                    activeOpacity={0.7}
-                    onPress={() => navigation.navigate("LeaveStatusContent", item)}
-                  >
-                    <View style={styles.recentInfo}>
-                      <Text style={styles.recentType}>{item.type || "-"}</Text>
-                      <Text style={styles.recentDate}>
-                        {formatDate(item.startDate)}
-                        {item.endDate && item.endDate !== item.startDate
-                          ? ` ~ ${formatDate(item.endDate)}`
-                          : ""}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: theme.bg },
-                      ]}
+              (() => {
+                const items = recentRequests.map((item) => {
+                  const displayStatus = item.approvalStatus || item.status || "-";
+                  const theme = STATUS_STYLE[displayStatus] || STATUS_STYLE["대기"];
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.recentRow}
+                      activeOpacity={0.7}
+                      onPress={() =>
+                        navigation.navigate("LeaveStatusContent", item)
+                      }
                     >
-                      <Text style={[styles.statusBadgeText, { color: theme.text }]}>
-                        {displayStatus}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+                      <View style={styles.recentInfo}>
+                        <Text style={styles.recentType}>{item.type || "-"}</Text>
+                        <Text style={styles.recentDate}>
+                          {formatDate(item.startDate)}
+                          {item.endDate && item.endDate !== item.startDate
+                            ? ` ~ ${formatDate(item.endDate)}`
+                            : ""}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: theme.bg },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusBadgeText,
+                            { color: theme.text },
+                          ]}
+                        >
+                          {displayStatus}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                });
+
+                if (!shouldScrollRecent) return items;
+
+                return (
+                  <ScrollView
+                    style={{ maxHeight: recentScrollMaxHeight }}
+                    showsVerticalScrollIndicator
+                  >
+                    {items}
+                  </ScrollView>
                 );
-              })
+              })()
             )}
           </View>
         </View>
@@ -634,6 +686,12 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     gap: 16,
   },
+  pageContentMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 20,
+    gap: 12,
+  },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -684,14 +742,23 @@ const styles = StyleSheet.create({
   gridRowStack: {
     flexDirection: "column",
   },
+  gridRowStackMobile: {
+    gap: 12,
+  },
   card: {
-    flex: 1,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     padding: 20,
     gap: 12,
+  },
+  cardStretch: {
+    flex: 1,
+  },
+  cardMobile: {
+    padding: 16,
+    gap: 10,
   },
   balanceCard: {
     minWidth: 320,
@@ -825,6 +892,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
     gap: 8,
   },
+  quickCardMobile: {
+    marginTop: 12,
+    padding: 12,
+  },
   quickCardTitle: {
     fontSize: 14,
     fontWeight: "600",
@@ -838,6 +909,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     flexWrap: "wrap",
+  },
+  quickCardButtonsMobile: {
+    gap: 8,
   },
   quickCardButtonPrimary: {
     backgroundColor: "#121D6D",

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ImageBackground,
   Image,
+  useWindowDimensions,
 } from "react-native";
 import SideBackground from "../../../assets/img/login.webp";
 import WhiteLogo from "../../../assets/logo/white_logo.png";
@@ -14,34 +15,61 @@ const DEFAULT_SIDE_NOTE =
   "본 서비스는 사내 서비스로, \n (주)에스티케이엔지니어링 직원에 한하여 사용 가능합니다.";
 
 export default function AuthLayout({ children }) {
+  const { width } = useWindowDimensions();
+  const isTablet = width < 900;
+  const isMobile = width < 640;
+
   return (
-    <View style={styles.page}>
-      <View style={styles.card}>
-        <View style={styles.cardRow}>
-          <ImageBackground
-            source={SideBackground}
-            style={styles.sidePanel}
-            imageStyle={styles.sidePanelImage}
-          >
-            <Image
+    <View style={[styles.page, isMobile && styles.pageMobile]}>
+      <View
+        style={[
+          styles.card,
+          isTablet && styles.cardTablet,
+          isMobile && styles.cardMobile,
+        ]}
+      >
+        <View
+          style={[
+            styles.cardRow,
+            isMobile && styles.cardRowMobile,
+          ]}
+        >
+          {!isMobile && (
+            <ImageBackground
               source={SideBackground}
-              style={styles.sidePanelContain}
-              resizeMode="contain"
-            />
-            <View style={styles.sideOverlay}>
-              <Text style={styles.sideNote}>{DEFAULT_SIDE_NOTE}</Text>
+              style={[
+                styles.sidePanel,
+                isTablet && styles.sidePanelTablet,
+              ]}
+              imageStyle={styles.sidePanelImage}
+            >
               <Image
-                source={WhiteLogo}
-                style={styles.sideLogo}
+                source={SideBackground}
+                style={styles.sidePanelContain}
                 resizeMode="contain"
               />
-            </View>
-          </ImageBackground>
+              <View style={styles.sideOverlay}>
+                <Text style={styles.sideNote}>{DEFAULT_SIDE_NOTE}</Text>
+                <Image
+                  source={WhiteLogo}
+                  style={styles.sideLogo}
+                  resizeMode="contain"
+                />
+              </View>
+            </ImageBackground>
+          )}
 
-          <View style={styles.formPanel}>{children}</View>
+          <View
+            style={[
+              styles.formPanel,
+              isMobile && styles.formPanelMobile,
+            ]}
+          >
+            {children}
+          </View>
         </View>
       </View>
-      <Text style={styles.copyright}>
+      <Text style={[styles.copyright, isMobile && styles.copyrightMobile]}>
         Copyright © STK Engineering All Rights Reserved.
       </Text>
     </View>
@@ -55,6 +83,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 60,
     paddingHorizontal: 20,
+  },
+  pageMobile: {
+    paddingVertical: 28,
   },
   card: {
     width: "100%",
@@ -71,9 +102,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     overflow: "hidden",
   },
+  cardTablet: {
+    maxWidth: 680,
+    minHeight: 420,
+  },
+  cardMobile: {
+    maxWidth: 520,
+    minHeight: undefined,
+  },
   cardRow: {
     flexDirection: "row",
     alignItems: "stretch",
+  },
+  cardRowMobile: {
+    flexDirection: "column",
   },
   sidePanel: {
     width: 280,
@@ -83,6 +125,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     overflow: "hidden",
     alignSelf: "stretch"
+  },
+  sidePanelTablet: {
+    width: 240,
+    minHeight: 420,
   },
   sidePanelImage: {
     resizeMode: "contain",
@@ -123,11 +169,19 @@ const styles = StyleSheet.create({
     padding: 36,
     gap: 16,
   },
+  formPanelMobile: {
+    padding: 24,
+    gap: 12,
+  },
   copyright: {
     marginTop: 40,
     fontSize: 14,
     color: "#6d7177ff",
     fontFamily: FONT_BODY,
     textAlign: "center",
+  },
+  copyrightMobile: {
+    marginTop: 24,
+    fontSize: 12,
   },
 });

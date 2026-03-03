@@ -8,6 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import Checkbox from "expo-checkbox";
 import api from "../../api/api";
@@ -30,6 +31,13 @@ function formatDays(value) {
 
 export default function DepartmentLeave() {
   const currentYear = new Date().getFullYear();
+  const { width, height } = useWindowDimensions();
+  const isMobile = width < 800;
+  const tableMinWidth = isMobile ? 720 : "100%";
+  const tableBodyHeight = Math.max(
+    240,
+    Math.min(isMobile ? 360 : 460, height - (isMobile ? 380 : 320))
+  );
   const minYear = 2026;
   const maxYear = currentYear + 1;
   const [year, setYear] = useState(Math.max(currentYear, minYear));
@@ -128,11 +136,11 @@ export default function DepartmentLeave() {
       {columns.map((col) => (
         <TouchableOpacity
           key={col.key}
-          style={[styles.cell, { width: col.width }]}
+          style={[styles.cell, isMobile && styles.cellMobile, { width: col.width }]}
           activeOpacity={0.7}
           onPress={() => col.sortable && handleSort(col.key)}
         >
-          <Text style={styles.headerText}>
+          <Text style={[styles.headerText, isMobile && styles.headerTextMobile]}>
             {col.title}
             {sort.key === col.key && (
               <Text style={styles.sortIcon}>
@@ -148,27 +156,35 @@ export default function DepartmentLeave() {
   const renderRow = ({ item }) => {
     return (
       <View style={styles.row}>
-        <View style={[styles.cell, { width: columns[0].width }]}>
-          <Text style={styles.cellText} numberOfLines={1}>
+        <View style={[styles.cell, isMobile && styles.cellMobile, { width: columns[0].width }]}>
+          <Text style={[styles.cellText, isMobile && styles.cellTextMobile]} numberOfLines={1}>
             {item?.employee?.name ?? "-"}
           </Text>
         </View>
-        <View style={[styles.cell, { width: columns[1].width }]}>
-          <Text style={styles.cellText}>{item?.employee?.level ?? "-"}</Text>
+        <View style={[styles.cell, isMobile && styles.cellMobile, { width: columns[1].width }]}>
+          <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
+            {item?.employee?.level ?? "-"}
+          </Text>
         </View>
-        <View style={[styles.cell, { width: columns[2].width }]}>
-          <Text style={styles.cellText}>{formatDays(item?.totalDays)}일</Text>
+        <View style={[styles.cell, isMobile && styles.cellMobile, { width: columns[2].width }]}>
+          <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
+            {formatDays(item?.totalDays)}일
+          </Text>
         </View>
-        <View style={[styles.cell, { width: columns[3].width }]}>
-          <Text style={styles.cellText}>{formatDays(item?.usedDays)}일</Text>
+        <View style={[styles.cell, isMobile && styles.cellMobile, { width: columns[3].width }]}>
+          <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
+            {formatDays(item?.usedDays)}일
+          </Text>
         </View>
-        <View style={[styles.cell, { width: columns[4].width }]}>
-          <Text style={styles.cellText}>
+        <View style={[styles.cell, isMobile && styles.cellMobile, { width: columns[4].width }]}>
+          <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
             {formatDays(item?.remainingDays)}일
           </Text>
         </View>
-        <View style={[styles.cell, { width: columns[5].width }]}>
-          <Text style={styles.cellText}>{item?.employee?.hireDate ?? "-"}</Text>
+        <View style={[styles.cell, isMobile && styles.cellMobile, { width: columns[5].width }]}>
+          <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
+            {item?.employee?.hireDate ?? "-"}
+          </Text>
         </View>
       </View>
     );
@@ -184,10 +200,13 @@ export default function DepartmentLeave() {
     <PageLayout
       breadcrumb={breadcrumb}
       scroll={false}
-      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+      contentStyle={[
+        styles.pageContent,
+        isMobile && styles.pageContentMobile,
+      ]}
     >
-      <View style={styles.page}>
-      <View style={styles.filterCard}>
+      <View style={[styles.page, isMobile && styles.pageMobile]}>
+      <View style={[styles.filterCard, isMobile && styles.filterCardMobile]}>
         <View style={styles.titleRow}>
           <View>
             <Text style={styles.title}>부서별 연차 일수 조회</Text>
@@ -215,7 +234,7 @@ export default function DepartmentLeave() {
         </View>
 
         {!loading && (
-          <View style={styles.filterRow}>
+          <View style={[styles.filterRow, isMobile && styles.filterRowMobile]}>
             <View style={styles.filterGroup}>
               <Text style={styles.filterLabel}>부서 필터</Text>
               <View style={styles.checkboxRow}>
@@ -288,13 +307,13 @@ export default function DepartmentLeave() {
               </View>
             </View>
 
-            <View style={styles.searchGroup}>
+            <View style={[styles.searchGroup, isMobile && styles.searchGroupMobile]}>
               <Text style={styles.filterLabel}>검색</Text>
               <TextInput
                 value={nameQuery}
                 onChangeText={setNameQuery}
                 placeholder="이름 검색"
-                style={styles.searchInput}
+                style={[styles.searchInput, isMobile && styles.searchInputMobile]}
                 autoCorrect={false}
                 autoCapitalize="none"
               />
@@ -303,7 +322,7 @@ export default function DepartmentLeave() {
         )}
       </View>
 
-      <View style={styles.tableCard}>
+      <View style={[styles.tableCard, isMobile && styles.tableCardMobile]}>
         <View style={styles.tableHeaderRow}>
           <Text style={styles.tableTitle}>조회 결과</Text>
         </View>
@@ -325,9 +344,9 @@ export default function DepartmentLeave() {
             horizontal
             contentContainerStyle={styles.tableScrollContent}
           >
-            <View style={styles.tableWrap}>
+            <View style={[styles.tableWrap, { minWidth: tableMinWidth }]}>
               {renderHeader()}
-              <View style={styles.tableBody}>
+              <View style={[styles.tableBody, { height: tableBodyHeight }]}>
                 <FlatList
                   key={`${selectedDept.join(",")}-${nameQuery}`}
                   data={
@@ -366,6 +385,19 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 16,
   },
+  pageMobile: {
+    gap: 12,
+  },
+  pageContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  pageContentMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 18,
+  },
   filterCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -373,6 +405,10 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     padding: 16,
     gap: 14,
+  },
+  filterCardMobile: {
+    padding: 12,
+    gap: 12,
   },
   titleRow: {
     flexDirection: "row",
@@ -387,12 +423,20 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flexWrap: "wrap",
   },
+  filterRowMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 12,
+  },
   filterGroup: {
     flex: 1,
     minWidth: 280,
   },
   searchGroup: {
     width: 300,
+  },
+  searchGroupMobile: {
+    width: "100%",
   },
   filterLabel: {
     fontSize: 12,
@@ -431,6 +475,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: "#fff",
   },
+  searchInputMobile: {
+    height: 38,
+  },
   yearControl: {
     flexDirection: "row",
     alignItems: "center",
@@ -455,6 +502,9 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     padding: 12,
     minHeight: 240,
+  },
+  tableCardMobile: {
+    padding: 10,
   },
   tableHeaderRow: {
     flexDirection: "row",
@@ -489,7 +539,10 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#EEE" },
   cell: { padding: 12, justifyContent: "center" },
+  cellMobile: { paddingVertical: 8, paddingHorizontal: 8 },
   headerText: { fontWeight: "600" },
+  headerTextMobile: { fontSize: 12 },
   sortIcon: { color: "#64748B", fontWeight: "600" },
   cellText: { color: "#333" },
+  cellTextMobile: { fontSize: 12 },
 });

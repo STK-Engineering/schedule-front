@@ -8,6 +8,8 @@ import {
   Platform,
   Modal,
   ScrollView,
+  StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import Checkbox from "expo-checkbox";
 import { Calendar, DefaultCalendarEventRenderer } from "react-native-big-calendar";
@@ -431,6 +433,9 @@ const moveByMode = (date, mode, step) => {
 
 export default function Schedule() {
   const route = useRoute();
+  const { width, height } = useWindowDimensions();
+  const isMobile = width < 800;
+  const isNarrow = width < 520;
 
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -459,11 +464,18 @@ export default function Schedule() {
   const [showOvertime, setShowOvertime] = useState(true);
   const [showSchedule, setShowSchedule] = useState(true);
 
+  const popoverWidth = Math.min(360, Math.max(280, width - 24));
+  const calendarHeight = Math.max(
+    480,
+    Math.min(760, height - (isMobile ? 260 : 220))
+  );
+
   const openEventModal = (event, pressEvent) => {
+    const isScheduleEvent = event?.raw?.isSchedule;
     setSelectedEvent(event);
     setEventModalOpen(true);
-    const popWidth = 360;
-    const popHeight = 400;
+    const popWidth = popoverWidth;
+    const popHeight = isScheduleEvent ? (isMobile ? 520 : 420) : isMobile ? 420 : 360;
     const maxX = Math.max(
       8,
       (containerRect.width || popWidth + 16) - popWidth - 8
@@ -542,6 +554,14 @@ export default function Schedule() {
     leaveType === "오전반차" ||
     leaveType === "오후반차" ||
     detail?.isOvertime;
+  const popoverMaxHeight = isSchedule
+    ? isMobile
+      ? 520
+      : 420
+    : isMobile
+    ? 420
+    : 360;
+  const popoverPadding = isNarrow ? 16 : 20;
 
   const formatDate = (date) => {
     if (!date) return "-";
@@ -929,63 +949,44 @@ export default function Schedule() {
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        paddingVertical: 9,
-        paddingHorizontal: 8,
-        borderWidth: 1,
-        borderColor: "#E2E8F0",
-        borderRadius: 8,
-        backgroundColor: "white",
-      }}
+      style={[
+        styles.filterChip,
+        isMobile && styles.filterChipMobile,
+      ]}
     >
       <Checkbox value={checked} onValueChange={onPress} color="#121D6D" />
-      <Text style={{ fontSize: 12, color: "#0F172A", fontWeight: "600" }}>
+      <Text
+        style={[
+          styles.filterLabel,
+          isMobile && styles.filterLabelMobile,
+        ]}
+      >
         {label}
       </Text>
     </TouchableOpacity>
   );
 
   return (
-    <View style={{ flex: 1, paddingTop: 12, backgroundColor: "#FFFFFF" }}>
-      <View
-        style={{
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 8,
-          gap: 12,
-          position: "relative",
-          zIndex: 10,
-          elevation: 10,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+    <View style={[styles.page, isMobile && styles.pageMobile]}>
+      <View style={[styles.toolbar, isMobile && styles.toolbarMobile]}>
+        <View style={[styles.toolbarRow, isMobile && styles.toolbarRowMobile]}>
+          <View style={[styles.dateRow, isMobile && styles.dateRowMobile]}>
             <TouchableOpacity
               onPress={() =>
                 setCurrentDate((prev) =>
                   normalizeForMode(moveByMode(prev, mode, -1), mode)
                 )
               }
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              style={styles.navButton}
             >
-              <Text style={{ fontSize: 14, color: "#475569" }}>◀</Text>
+              <Text style={styles.navButtonText}>◀</Text>
             </TouchableOpacity>
-            <Text style={{ fontSize: 22, fontWeight: "bold" }}>
+            <Text
+              style={[
+                styles.monthTitle,
+                isMobile && styles.monthTitleMobile,
+              ]}
+            >
               {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
             </Text>
             <TouchableOpacity
@@ -994,190 +995,167 @@ export default function Schedule() {
                   normalizeForMode(moveByMode(prev, mode, +1), mode)
                 )
               }
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              style={styles.navButton}
             >
-              <Text style={{ fontSize: 14, color: "#475569" }}>▶</Text>
+              <Text style={styles.navButtonText}>▶</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{ flex: 1, alignItems: "center" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-              >
-                <View
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 3,
-                    backgroundColor: "#FCE7F3",
-                    borderWidth: 1,
-                    borderColor: "#F9A8D4",
-                  }}
-                />
-                <Text style={{ fontSize: 12, color: "#6B7280" }}>휴가</Text>
+          <View
+            style={[
+              styles.legendWrap,
+              isMobile && styles.legendWrapMobile,
+            ]}
+          >
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={styles.legendSwatchLeave} />
+                <Text
+                  style={[
+                    styles.legendText,
+                    isMobile && styles.legendTextMobile,
+                  ]}
+                >
+                  휴가
+                </Text>
               </View>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-              >
-                <View
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 3,
-                    backgroundColor: "#E0F2FE",
-                    borderWidth: 1,
-                    borderColor: "#93C5FD",
-                  }}
-                />
-                <Text style={{ fontSize: 12, color: "#6B7280" }}>
+              <View style={styles.legendItem}>
+                <View style={styles.legendSwatchOvertime} />
+                <Text
+                  style={[
+                    styles.legendText,
+                    isMobile && styles.legendTextMobile,
+                  ]}
+                >
                   연장 근로
                 </Text>
               </View>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-              >
-                <View
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 3,
-                    backgroundColor: "#FEF9C3",
-                    borderWidth: 1,
-                    borderColor: "#FACC15",
-                  }}
-                />
-                <Text style={{ fontSize: 12, color: "#6B7280" }}>작업 일정</Text>
+              <View style={styles.legendItem}>
+                <View style={styles.legendSwatchSchedule} />
+                <Text
+                  style={[
+                    styles.legendText,
+                    isMobile && styles.legendTextMobile,
+                  ]}
+                >
+                  작업 일정
+                </Text>
               </View>
             </View>
           </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View
-              style={{
-                position: "relative",
-                zIndex: 20,
-                elevation: 20,
-              }}
-            >
-          <TouchableOpacity
-            onPress={() => setDeptOpen(!deptOpen)}
-            style={{
-              width: 200,
-              height: 40,
-              borderWidth: 1,
-              borderColor: "#E5E7EB",
-              borderRadius: 8,
-              padding: 10,
-              flexDirection: "row",
-              justifyContent: "space-between",
-              backgroundColor: "white",
-              zIndex: 30,
-              elevation: 30,
-            }}
+          <View
+            style={[
+              styles.controlsRow,
+              isMobile && styles.controlsRowMobile,
+            ]}
           >
-            <Text numberOfLines={1}>부서: {getDeptLabel()}</Text>
-            <Text>{deptOpen ? "▲" : "▼"}</Text>
-          </TouchableOpacity>
+            <View style={styles.deptWrap}>
+              <TouchableOpacity
+                onPress={() => setDeptOpen(!deptOpen)}
+                style={[
+                  styles.deptButton,
+                  isMobile && styles.deptButtonMobile,
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.deptButtonText,
+                    isNarrow && styles.deptButtonTextSmall,
+                  ]}
+                >
+                  부서: {getDeptLabel()}
+                </Text>
+                <Text style={styles.deptButtonText}>
+                  {deptOpen ? "▲" : "▼"}
+                </Text>
+              </TouchableOpacity>
 
-          {deptOpen && (
-            <View
-              style={{
-                position: "absolute",
-                top: 40,
-                left: 0,
-                width: 200,
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                backgroundColor: "white",
-                zIndex: 9999,
-                elevation: 9999,
-              }}
-            >
-              {departments.length === 0 ? (
-                <View style={{ padding: 10 }}>
-                  <Text style={{ color: "#6B7280" }}>
-                    표시할 부서가 없습니다
-                  </Text>
-                </View>
-              ) : (
-                departments.map((dept) => {
-                  const isSelected = selectedDept.includes(dept);
-                  return (
-                    <TouchableOpacity
-                      key={dept}
-                      onPress={() => toggleDept(dept)}
-                      style={{
-                        padding: 10,
-                        flexDirection: "row",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Image
-                        source={departmentIcon}
-                        style={{ width: 18, height: 18, marginRight: 8 }}
-                        resizeMode="contain"
-                      />
-                      <Text
-                        style={{ color: isSelected ? "#2563EB" : "#6B7280" }}
-                      >
-                        {dept}
+              {deptOpen && (
+                <View
+                  style={[
+                    styles.deptDropdown,
+                    isMobile && styles.deptDropdownMobile,
+                  ]}
+                >
+                  {departments.length === 0 ? (
+                    <View style={styles.deptEmpty}>
+                      <Text style={styles.deptEmptyText}>
+                        표시할 부서가 없습니다
                       </Text>
-                    </TouchableOpacity>
-                  );
-                })
+                    </View>
+                  ) : (
+                    departments.map((dept) => {
+                      const isSelected = selectedDept.includes(dept);
+                      return (
+                        <TouchableOpacity
+                          key={dept}
+                          onPress={() => toggleDept(dept)}
+                          style={styles.deptItem}
+                        >
+                          <Image
+                            source={departmentIcon}
+                            style={styles.deptIcon}
+                            resizeMode="contain"
+                          />
+                          <Text
+                            style={[
+                              styles.deptItemText,
+                              isSelected && styles.deptItemTextActive,
+                            ]}
+                          >
+                            {dept}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </View>
               )}
             </View>
-          )}
+
+            {!isMobile ? (
+              <TouchableOpacity
+                onPress={() => setOnlyMine((v) => !v)}
+                style={styles.mineButton}
+                disabled={loading}
+              >
+                <Text style={styles.mineButtonText}>
+                  {onlyMine ? "전체 일정 보기" : "내 일정만 보기"}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <View
+              style={[
+                styles.filterRow,
+                isMobile && styles.filterRowMobile,
+              ]}
+            >
+              <FilterCheckbox
+                label="전체"
+                checked={allChecked}
+                onPress={toggleAll}
+              />
+              <FilterCheckbox
+                label="휴가"
+                checked={showLeave}
+                onPress={() => setShowLeave((v) => !v)}
+              />
+              <FilterCheckbox
+                label="연장 근로"
+                checked={showOvertime}
+                onPress={() => setShowOvertime((v) => !v)}
+              />
+              <FilterCheckbox
+                label="작업 일정"
+                checked={showSchedule}
+                onPress={() => setShowSchedule((v) => !v)}
+              />
+            </View>
           </View>
-
-        <TouchableOpacity
-          onPress={() => setOnlyMine((v) => !v)}
-          style={{
-            height: 40,
-            paddingVertical: 10,
-            paddingHorizontal: 15,
-            backgroundColor: "white",
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: "#E5E7EB",
-          }}
-          disabled={loading}
-        >
-          <Text>{onlyMine ? "전체 일정 보기" : "내 일정만 보기"}</Text>
-        </TouchableOpacity>
-
-        <View style={{ flexDirection: "row", gap: 10, padding: 6 }}>
-          <FilterCheckbox
-            label="전체"
-            checked={allChecked}
-            onPress={toggleAll}
-          />
-          <FilterCheckbox
-            label="휴가"
-            checked={showLeave}
-            onPress={() => setShowLeave((v) => !v)}
-          />
-          <FilterCheckbox
-            label="연장 근로"
-            checked={showOvertime}
-            onPress={() => setShowOvertime((v) => !v)}
-          />
-          <FilterCheckbox
-            label="작업 일정"
-            checked={showSchedule}
-            onPress={() => setShowSchedule((v) => !v)}
-          />
         </View>
-        </View>
-        </View>
-
       </View>
       <View
         ref={calendarWrapRef}
@@ -1197,17 +1175,19 @@ export default function Schedule() {
       >
         <Calendar
           events={events}
-          height={500}
+          height={calendarHeight}
           mode={mode}
           date={currentDate}
           swipeEnabled={false}
-          maxVisibleEventCount={4}
-          moreLabel="+ {moreCount}개의 일정 더보기"
+          maxVisibleEventCount={isMobile ? 2 : 4}
+          moreLabel={
+            isMobile ? "+ {moreCount} 더보기" : "+ {moreCount}개의 일정 더보기"
+          }
           theme={{
             palette: { moreLabel: "#94A3B8" },
             typography: {
               moreLabel: {
-                fontSize: 12,
+                fontSize: isMobile ? 10 : 12,
                 fontWeight: "500",
                 textAlign: "center",
                 paddingTop: 5,
@@ -1294,13 +1274,13 @@ export default function Schedule() {
               position: "absolute",
               top: eventPopoverPos.y,
               left: eventPopoverPos.x,
-              width: 360,
-              height: isSchedule ? 420 : undefined,
+              width: popoverWidth,
+              maxHeight: popoverMaxHeight,
               backgroundColor: "#FFFFFF",
               borderRadius: 10,
               borderWidth: 1,
               borderColor: "#E2E8F0",
-              padding: 20,
+              padding: popoverPadding,
               shadowColor: "#0F172A",
               shadowOpacity: 0.08,
               shadowRadius: 10,
@@ -1529,14 +1509,14 @@ export default function Schedule() {
             <TouchableOpacity
               activeOpacity={1}
               onPress={() => {}}
-              style={{
-                width: "100%",
-                maxWidth: 460,
-                backgroundColor: "#FFFFFF",
-                borderRadius: 20,
-                padding: 18,
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
+            style={{
+              width: "100%",
+              maxWidth: isNarrow ? 360 : 460,
+              backgroundColor: "#FFFFFF",
+              borderRadius: isNarrow ? 16 : 20,
+              padding: isNarrow ? 14 : 18,
+              borderWidth: 1,
+              borderColor: "#E2E8F0",
                 shadowColor: "#0F172A",
                 shadowOpacity: 0.15,
                 shadowRadius: 16,
@@ -1884,10 +1864,10 @@ export default function Schedule() {
             onPress={() => {}}
             style={{
               width: "100%",
-              maxWidth: 460,
+              maxWidth: isNarrow ? 360 : 460,
               backgroundColor: "#FFFFFF",
-              borderRadius: 20,
-              padding: 18,
+              borderRadius: isNarrow ? 16 : 20,
+              padding: isNarrow ? 14 : 18,
               borderWidth: 1,
               borderColor: "#E2E8F0",
               shadowColor: "#0F172A",
@@ -1906,7 +1886,7 @@ export default function Schedule() {
               </Text>
             </View>
 
-            <ScrollView style={{ maxHeight: 360 }}>
+            <ScrollView style={{ maxHeight: isMobile ? 300 : 360 }}>
               {dayEvents.length === 0 ? (
                 <Text style={{ color: "#64748B" }}>
                   해당 날짜에 일정이 없습니다.
@@ -1987,3 +1967,238 @@ export default function Schedule() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    paddingTop: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  pageMobile: {
+    paddingTop: 8,
+  },
+  toolbar: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 12,
+    position: "relative",
+    zIndex: 10,
+    elevation: 10,
+  },
+  toolbarMobile: {
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  toolbarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  toolbarRowMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 12,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  dateRowMobile: {
+    justifyContent: "center",
+  },
+  navButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navButtonText: {
+    fontSize: 14,
+    color: "#475569",
+  },
+  monthTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+  },
+  monthTitleMobile: {
+    fontSize: 18,
+  },
+  legendWrap: {
+    flex: 1,
+    alignItems: "center",
+  },
+  legendWrapMobile: {
+    alignItems: "flex-start",
+  },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendSwatchLeave: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: "#FCE7F3",
+    borderWidth: 1,
+    borderColor: "#F9A8D4",
+  },
+  legendSwatchOvertime: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: "#E0F2FE",
+    borderWidth: 1,
+    borderColor: "#93C5FD",
+  },
+  legendSwatchSchedule: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: "#FEF9C3",
+    borderWidth: 1,
+    borderColor: "#FACC15",
+  },
+  legendText: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  legendTextMobile: {
+    fontSize: 11,
+  },
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  controlsRowMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 10,
+  },
+  deptWrap: {
+    position: "relative",
+    zIndex: 20,
+    elevation: 20,
+  },
+  deptButton: {
+    width: 200,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "white",
+    zIndex: 30,
+    elevation: 30,
+  },
+  deptButtonMobile: {
+    width: "100%",
+  },
+  deptButtonText: {
+    fontSize: 13,
+    color: "#0F172A",
+  },
+  deptButtonTextSmall: {
+    fontSize: 12,
+  },
+  deptDropdown: {
+    position: "absolute",
+    top: 40,
+    left: 0,
+    width: 200,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "white",
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  deptDropdownMobile: {
+    width: "100%",
+  },
+  deptEmpty: {
+    padding: 10,
+  },
+  deptEmptyText: {
+    color: "#6B7280",
+  },
+  deptItem: {
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  deptIcon: {
+    width: 18,
+    height: 18,
+    marginRight: 8,
+  },
+  deptItemText: {
+    color: "#6B7280",
+  },
+  deptItemTextActive: {
+    color: "#2563EB",
+  },
+  mineButton: {
+    height: 40,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    backgroundColor: "white",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mineButtonMobile: {
+    width: "100%",
+  },
+  mineButtonText: {
+    fontSize: 13,
+    color: "#0F172A",
+  },
+  mineButtonTextSmall: {
+    fontSize: 12,
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 10,
+    padding: 6,
+    alignItems: "center",
+  },
+  filterRowMobile: {
+    flexWrap: "wrap",
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    backgroundColor: "white",
+  },
+  filterChipMobile: {
+    paddingVertical: 7,
+  },
+  filterLabel: {
+    fontSize: 12,
+    color: "#0F172A",
+    fontWeight: "600",
+  },
+  filterLabelMobile: {
+    fontSize: 11,
+  },
+});

@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   useWindowDimensions,
+  Modal,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import PageLayout from "../../components/PageLayout";
@@ -118,11 +119,11 @@ export default function Form() {
   const [pendingInternalNames2, setPendingInternalNames2] = useState([]);
   const endTimeAlertTimerRef = useRef(null);
   const prefillDoneRef = useRef(false);
-  const [jobSuggestions, setJobSuggestions] = useState([]);
-  const [jobSuggestionLoading, setJobSuggestionLoading] = useState(false);
-  const [showJobSuggestions, setShowJobSuggestions] = useState(false);
-  const suggestionClickRef = useRef(false);
-  const jobSuggestionRequestIdRef = useRef(0);
+  const [jobSearchOpen, setJobSearchOpen] = useState(false);
+  const [jobSearchKeyword, setJobSearchKeyword] = useState("");
+  const [jobSearchResults, setJobSearchResults] = useState([]);
+  const [jobSearchLoading, setJobSearchLoading] = useState(false);
+  const [jobSearchError, setJobSearchError] = useState("");
 
   const hasVesselOrHull =
     vesselName.trim().length > 0 || hullNo.trim().length > 0;
@@ -174,70 +175,49 @@ export default function Form() {
     if (force || !systemType) setSystemType(nextSystemType);
   };
 
-  const findSuggestionToApply = () => {
-    if (!jobSuggestions.length) return null;
-    const keyword = normalizeKeyword(jobNumber).toLowerCase();
-    if (!keyword) return null;
-    return (
-      jobSuggestions.find(
-        (item) => String(item?.jobNumber ?? "").toLowerCase() === keyword,
-      ) || jobSuggestions[0]
-    );
+  const openJobSearch = () => {
+    setJobSearchKeyword(jobNumber || "");
+    setJobSearchResults([]);
+    setJobSearchError("");
+    setJobSearchOpen(true);
   };
 
-  useEffect(() => {
-    const keyword = normalizeKeyword(jobNumber);
+  const closeJobSearch = () => {
+    setJobSearchOpen(false);
+  };
+
+  const runJobSearch = async () => {
+    const keyword = normalizeKeyword(jobSearchKeyword);
     if (!keyword) {
-      setJobSuggestions([]);
-      setJobSuggestionLoading(false);
+      setJobSearchResults([]);
+      setJobSearchError("검색어를 입력해 주세요.");
       return;
     }
-
-    let mounted = true;
-    const currentRequestId = (jobSuggestionRequestIdRef.current += 1);
-    const handle = setTimeout(async () => {
-      try {
-        setJobSuggestionLoading(true);
-        const res = await api.get("/engineer-schedule/quotation", {
-          params: { keyword, page: 0, size: 50 },
-        });
-        if (
-          !mounted ||
-          currentRequestId !== jobSuggestionRequestIdRef.current
-        ) {
-          return;
-        }
-        const list = Array.isArray(res.data?.content) ? res.data.content : [];
-        setJobSuggestions(list);
-
-        const exact = list.find(
-          (item) =>
-            String(item?.jobNumber ?? "").toLowerCase() ===
-            keyword.toLowerCase(),
-        );
-        if (exact) {
-          applyQuotation(exact, { force: false });
-        }
-      } catch (e) {
-        if (
-          !mounted ||
-          currentRequestId !== jobSuggestionRequestIdRef.current
-        ) {
-          return;
-        }
-        setJobSuggestions([]);
-      } finally {
-        if (mounted && currentRequestId === jobSuggestionRequestIdRef.current) {
-          setJobSuggestionLoading(false);
-        }
+    try {
+      setJobSearchLoading(true);
+      setJobSearchError("");
+      const res = await api.get("/engineer-schedule/quotation", {
+        params: { keyword, page: 0, size: 50 },
+      });
+      const list = Array.isArray(res.data?.content) ? res.data.content : [];
+      setJobSearchResults(list);
+      if (list.length === 0) {
+        setJobSearchError("검색 결과가 없습니다.");
       }
-    }, 250);
+    } catch (e) {
+      console.log("job search error:", e?.response?.data ?? e);
+      setJobSearchResults([]);
+      setJobSearchError("검색에 실패했습니다.");
+    } finally {
+      setJobSearchLoading(false);
+    }
+  };
 
-    return () => {
-      mounted = false;
-      clearTimeout(handle);
-    };
-  }, [jobNumber]);
+  const handleSelectJob = (item) => {
+    applyQuotation(item, { force: true });
+    setJobSearchOpen(false);
+    setJobSearchResults([]);
+  };
 
   useEffect(() => {
     if (!isFormValid && isChecked) {
@@ -745,116 +725,31 @@ export default function Form() {
           </Text>
         </View>
 
-        <View style={[styles.card, showJobSuggestions && styles.cardStackTop]}>
+        <View style={styles.card}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>신청 정보</Text>
             <Text style={styles.sectionSub}>* 표시는 필수 항목입니다.</Text>
           </View>
           <View style={styles.sectionDivider} />
 
-          <View
-            style={[
-              styles.fieldGroup,
-              showJobSuggestions && styles.fieldGroupOverlay,
-            ]}
-          >
+          <View style={styles.fieldGroup}>
             <Text style={styles.fieldGroupTitle}>작업 정보</Text>
-            <View
-              style={[
-                styles.fieldRow,
-                showJobSuggestions && styles.fieldRowOverlay,
-              ]}
-            >
-              <View
-                style={[
-                  styles.fieldItem,
-                  showJobSuggestions && styles.fieldItemOverlay,
-                ]}
-              >
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 작업 번호(Job Number)</Text>
-                <View style={styles.jobSuggestionAnchor}>
-                  <TextInput
-                    placeholder="예: STKP-26000203"
-                    value={jobNumber}
-                    onChangeText={(value) => {
-                      setJobNumber(value);
-                      if (!normalizeKeyword(value)) {
-                        setShowJobSuggestions(false);
-                        return;
-                      }
-                      if (!showJobSuggestions) setShowJobSuggestions(true);
-                    }}
-                    onFocus={() => setShowJobSuggestions(true)}
-                    onBlur={() => {
-                      setTimeout(() => {
-                        if (!suggestionClickRef.current) {
-                          setShowJobSuggestions(false);
-                        }
-                        suggestionClickRef.current = false;
-                      }, 150);
-                    }}
-                    onKeyPress={(e) => {
-                      if (e?.nativeEvent?.key !== "Enter") return;
-                      const target = findSuggestionToApply();
-                      if (target) {
-                        applyQuotation(target, { force: true });
-                        setShowJobSuggestions(false);
-                      }
-                    }}
-                    onSubmitEditing={() => {
-                      const target = findSuggestionToApply();
-                      if (target) {
-                        applyQuotation(target, { force: true });
-                        setShowJobSuggestions(false);
-                      }
-                    }}
-                    style={styles.input}
-                  />
-                  {showJobSuggestions && (
-                    <View style={styles.jobSuggestionBox}>
-                      {jobSuggestionLoading && (
-                        <Text style={styles.jobSuggestionHint}>검색 중...</Text>
-                      )}
-                      {!jobSuggestionLoading && jobSuggestions.length === 0 && (
-                        <Text style={styles.jobSuggestionHint}>
-                          검색 결과가 없습니다.
-                        </Text>
-                      )}
-                      {jobSuggestions.map((item) => (
-                        <TouchableOpacity
-                          key={`${item.jobNumber}-${item.imoNumber ?? ""}`}
-                          style={styles.jobSuggestionItem}
-                          activeOpacity={0.85}
-                          onPressIn={() => {
-                            suggestionClickRef.current = true;
-                          }}
-                          onPress={() => {
-                            applyQuotation(item, { force: true });
-                            setShowJobSuggestions(false);
-                          }}
-                        >
-                          <Text style={styles.jobSuggestionTitle}>
-                            {item.jobNumber}
-                          </Text>
-                          <Text
-                            style={styles.jobSuggestionSub}
-                            numberOfLines={1}
-                          >
-                            {[
-                              item.customer,
-                              item.vesselName,
-                              item.imoNumber,
-                              item.hullNo,
-                              item.sysName,
-                            ]
-                              .filter(Boolean)
-                              .join(" / ")}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={openJobSearch}
+                >
+                  <View pointerEvents="none">
+                    <TextInput
+                      placeholder="작업 번호 검색"
+                      value={jobNumber}
+                      editable={false}
+                      style={styles.input}
+                    />
+                  </View>
+                </TouchableOpacity>
               </View>
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 고객사명</Text>
@@ -930,7 +825,7 @@ export default function Form() {
             </View>
           </View>
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>* 작업 내용</Text>
+            <Text style={styles.fieldGroupTitle}>* Details of Service Request</Text>
             <View style={styles.fieldRow}>
               <View style={[styles.fieldItem, styles.fieldItemFull]}>
                 <TextInput
@@ -1096,11 +991,11 @@ export default function Form() {
           </View>
 
           <View style={styles.previewTable}>
-            <PreviewRow label="작업번호" value={jobNumber || "-"} />
-            <PreviewRow label="선박명" value={vesselName || "-"} />
+            <PreviewRow label="Job Number" value={jobNumber || "-"} />
+            <PreviewRow label="Vessel Name" value={vesselName || "-"} />
             <PreviewRow label="IMO Number" value={imoNumber || "-"} />
-            <PreviewRow label="호선" value={hullNo || "-"} />
-            <PreviewRow label="지역" value={region || "-"} />
+            <PreviewRow label="Hull No" value={hullNo || "-"} />
+            <PreviewRow label="Region" value={region || "-"} />
             <PreviewRow
               label="요청일자"
               value={
@@ -1113,8 +1008,8 @@ export default function Form() {
                   : "-"
               }
             />
-            <PreviewRow label="작업" value={workType || "-"} />
-            <PreviewRow label="종류" value={systemType || "-"} />
+            <PreviewRow label="Description" value={workType || "-"} />
+            <PreviewRow label="System" value={systemType || "-"} />
             <PreviewRow
               label={showSecondRange ? "엔지니어(1차)" : "엔지니어"}
               value={
@@ -1148,7 +1043,7 @@ export default function Form() {
               <PreviewRow label="비고(2차)" value={note2 || "-"} multiline />
             )}
             <PreviewRow
-              label="작업내용"
+              label="Details of Service Request"
               value={jobDescription || "-"}
               multiline
             />
@@ -1222,6 +1117,80 @@ export default function Form() {
           <Text style={styles.backButtonText}>뒤로</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={jobSearchOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closeJobSearch}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={closeJobSearch}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={styles.jobSearchModal}
+          >
+            <View style={styles.jobSearchHeader}>
+              <Text style={styles.jobSearchTitle}>작업 번호 검색</Text>
+              <TouchableOpacity onPress={closeJobSearch}>
+                <Text style={styles.jobSearchClose}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.jobSearchRow}>
+              <TextInput
+                value={jobSearchKeyword}
+                onChangeText={setJobSearchKeyword}
+                placeholder="작업 번호를 입력하세요"
+                style={styles.jobSearchInput}
+                autoCorrect={false}
+                autoCapitalize="none"
+                onSubmitEditing={runJobSearch}
+              />
+              <TouchableOpacity
+                style={styles.jobSearchButton}
+                onPress={runJobSearch}
+                disabled={jobSearchLoading}
+              >
+                <Text style={styles.jobSearchButtonText}>
+                  {jobSearchLoading ? "검색중..." : "찾기"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {jobSearchError ? (
+              <Text style={styles.jobSearchError}>{jobSearchError}</Text>
+            ) : null}
+            <ScrollView style={styles.jobSearchResultList}>
+              {jobSearchResults.map((item) => (
+                <TouchableOpacity
+                  key={`${item.jobNumber}-${item.imoNumber ?? ""}`}
+                  style={styles.jobSearchResultItem}
+                  activeOpacity={0.85}
+                  onPress={() => handleSelectJob(item)}
+                >
+                  <Text style={styles.jobSearchResultTitle}>
+                    {item.jobNumber}
+                  </Text>
+                  <Text style={styles.jobSearchResultSub} numberOfLines={2}>
+                    {[
+                      item.customer,
+                      item.vesselName,
+                      item.imoNumber,
+                      item.hullNo,
+                      item.sysName,
+                    ]
+                      .filter(Boolean)
+                      .join(" / ")}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </PageLayout>
   );
 }
@@ -1458,6 +1427,96 @@ const styles = StyleSheet.create({
   jobSuggestionAnchor: {
     position: "relative",
     zIndex: 9999,
+  },
+  jobSearchModal: {
+    width: "100%",
+    maxWidth: 520,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  jobSearchHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  jobSearchTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  jobSearchClose: {
+    fontSize: 13,
+    color: "#64748B",
+  },
+  jobSearchRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  jobSearchInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#CBD5F5",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#fff",
+  },
+  jobSearchButton: {
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: "#121D6D",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  jobSearchButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  jobSearchError: {
+    marginTop: 8,
+    color: "#EF4444",
+    fontSize: 12,
+  },
+  jobSearchResultList: {
+    marginTop: 12,
+    maxHeight: 320,
+  },
+  jobSearchResultItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    marginBottom: 8,
+  },
+  jobSearchResultTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  jobSearchResultSub: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
   engineerTagWrap: {
     flexDirection: "row",

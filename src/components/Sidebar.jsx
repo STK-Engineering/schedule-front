@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  useWindowDimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import api from "../api/api";
@@ -12,6 +13,9 @@ import { AuthContext } from "../context/AuthContext";
 
 export default function Sidebar({ collapsed = false, onRequestClose }) {
   const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 800;
+  const panelWidth = Math.min(260, Math.max(200, Math.floor(width * 0.72)));
   const { setIsLoggedIn } = useContext(AuthContext) ?? {};
   const [authorities, setAuthorities] = useState([]);
   const [isLoggedOut, setIsLoggedOut] = useState(false);
@@ -185,56 +189,108 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
   };
 
   return (
-    <Animated.View
+    <View
       pointerEvents={collapsed ? "none" : "auto"}
       style={[
-        styles.overlayPanel,
-        {
-          opacity: panelAnim,
-          transform: [
-            {
-              translateX: panelAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-8, 0],
-              }),
-            },
-          ],
-        },
+        styles.overlayRoot,
+        isMobile ? styles.overlayRootMobile : styles.overlayRootDesktop,
       ]}
-      onMouseLeave={() => {
-        if (!collapsed) onRequestClose?.();
-      }}
     >
-      <View style={styles.menuList}>
-        {menuSections.map((section) => (
-          <View key={section.id} style={styles.menuSection}>
-            <TouchableOpacity
-              style={styles.menuSectionHeader}
-              onPress={() => toggleSection(section.id)}
-            >
-              <Text style={styles.menuSectionTitle}>{section.title}</Text>
-              <Text style={styles.menuSectionArrow}>
-                {openSections[section.id] ? "▾" : "▸"}
-              </Text>
-            </TouchableOpacity>
-            {openSections[section.id] &&
-              section.items.map((item) => (
-                <TouchableOpacity
-                  key={item.route ?? item.label}
-                  style={styles.menuItem}
-                  onPress={() => handleMenuPress(item)}
+      {isMobile && !collapsed ? (
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.backdrop}
+          onPress={() => onRequestClose?.()}
+        />
+      ) : null}
+      <Animated.View
+        style={[
+          styles.overlayPanel,
+          isMobile && styles.overlayPanelMobile,
+          {
+            width: isMobile ? panelWidth : 240,
+            opacity: panelAnim,
+            transform: [
+              {
+                translateX: panelAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-8, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+        onMouseLeave={() => {
+          if (!collapsed && !isMobile) onRequestClose?.();
+        }}
+      >
+        <View style={styles.menuList}>
+          {menuSections.map((section) => (
+            <View key={section.id} style={styles.menuSection}>
+              <TouchableOpacity
+                style={styles.menuSectionHeader}
+                onPress={() => toggleSection(section.id)}
+              >
+                <Text
+                  style={[
+                    styles.menuSectionTitle,
+                    isMobile && styles.menuSectionTitleMobile,
+                  ]}
                 >
-                  <Text style={styles.menuItemText}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-          </View>
-        ))}
-      </View>
-    </Animated.View>
+                  {section.title}
+                </Text>
+                <Text
+                  style={[
+                    styles.menuSectionArrow,
+                    isMobile && styles.menuSectionArrowMobile,
+                  ]}
+                >
+                  {openSections[section.id] ? "▾" : "▸"}
+                </Text>
+              </TouchableOpacity>
+              {openSections[section.id] &&
+                section.items.map((item) => (
+                  <TouchableOpacity
+                    key={item.route ?? item.label}
+                    style={styles.menuItem}
+                    onPress={() => handleMenuPress(item)}
+                  >
+                    <Text
+                      style={[
+                        styles.menuItemText,
+                        isMobile && styles.menuItemTextMobile,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  overlayRoot: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 999,
+  },
+  overlayRootDesktop: {
+    width: 240,
+  },
+  overlayRootMobile: {
+    right: 0,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.25)",
+  },
   menuList: {
     gap: 6,
   },
@@ -252,9 +308,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#9ca3af",
   },
+  menuSectionTitleMobile: {
+    fontSize: 15,
+  },
   menuSectionArrow: {
     fontSize: 16,
     color: "#9ca3af",
+  },
+  menuSectionArrowMobile: {
+    fontSize: 15,
   },
   menuItem: {
     flexDirection: "column",
@@ -265,6 +327,9 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 15,
     color: "#000000ff",
+  },
+  menuItemTextMobile: {
+    fontSize: 14,
   },
   overlayPanel: {
     position: "absolute",
@@ -281,6 +346,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 6, height: 0 },
     zIndex: 999,
+  },
+  overlayPanelMobile: {
+    shadowOpacity: 0.12,
   },
 
   lockOverlay: {

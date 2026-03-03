@@ -10,6 +10,7 @@ import {
   TextInput,
   Alert,
   Image,
+  useWindowDimensions,
 } from "react-native";
 import api from "../../../api/api";
 import showIcon from "../../../../assets/icon/show.png";
@@ -93,6 +94,13 @@ const toLabel = (value) => {
 export default function ApprovalLine() {
   const navigation = useNavigation();
   const route = useRoute();
+  const { width, height } = useWindowDimensions();
+  const isMobile = width < 800;
+  const tableMinWidth = isMobile ? 720 : "100%";
+  const tableBodyHeight = Math.max(
+    240,
+    Math.min(isMobile ? 320 : 540, height - (isMobile ? 360 : 320))
+  );
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -402,20 +410,23 @@ export default function ApprovalLine() {
     <PageLayout
       breadcrumb={breadcrumb}
       scroll={false}
-      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+      contentStyle={[
+        styles.pageContent,
+        isMobile && styles.pageContentMobile,
+      ]}
     >
-      <View style={styles.page}>
-      <View style={styles.headerCard}>
+      <View style={[styles.page, isMobile && styles.pageMobile]}>
+      <View style={[styles.headerCard, isMobile && styles.headerCardMobile]}>
         <Text style={styles.pageTitle}>결재 라인 관리</Text>
         <Text style={styles.pageSub}>
           부서별 결재 라인을 확인하고 관리할 수 있습니다.
         </Text>
       </View>
 
-      <View style={styles.tableCard}>
+      <View style={[styles.tableCard, isMobile && styles.tableCardMobile]}>
         <View style={styles.tableHeaderRow}>
           <Text style={styles.tableTitle}>결재 라인 목록</Text>
-          <View style={styles.headerActions}>
+          <View style={[styles.headerActions, isMobile && styles.headerActionsMobile]}>
             <Text style={styles.countText}>총 {rowCount}개</Text>
             <TouchableOpacity style={styles.addBtn} onPress={openCreateModal}>
               <Text style={styles.addBtnText}>결재라인 추가</Text>
@@ -438,7 +449,7 @@ export default function ApprovalLine() {
             showsHorizontalScrollIndicator
             contentContainerStyle={styles.tableScrollContent}
           >
-            <View style={[styles.tableInner, { width: TABLE_WIDTH }]}>
+            <View style={[styles.tableInner, { minWidth: tableMinWidth }]}>
               <View style={styles.headerRow}>
                 {columns.map((col) => (
                   <View
@@ -446,41 +457,95 @@ export default function ApprovalLine() {
                     style={[
                       styles.cell,
                       styles.headerCell,
+                      isMobile && styles.cellMobile,
                       { width: col.width },
                     ]}
                   >
-                    <Text style={styles.headerText}>{col.title}</Text>
+                    <Text style={[styles.headerText, isMobile && styles.headerTextMobile]}>
+                      {col.title}
+                    </Text>
                   </View>
                 ))}
               </View>
-              <ScrollView style={styles.tableBody} nestedScrollEnabled>
+              <ScrollView
+                style={[styles.tableBody, { maxHeight: tableBodyHeight }]}
+                nestedScrollEnabled
+              >
                 {rows.map((row) => (
                   <View key={String(row.id)} style={styles.row}>
-                    <View style={[styles.cell, { width: columns[0].width }]}>
-                      <Text style={styles.cellText}>{row.department}</Text>
+                    <View
+                      style={[
+                        styles.cell,
+                        isMobile && styles.cellMobile,
+                        { width: columns[0].width },
+                      ]}
+                    >
+                      <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
+                        {row.department}
+                      </Text>
                     </View>
-                    <View style={[styles.cell, { width: columns[1].width }]}>
-                      <Text style={styles.cellText}>
+                    <View
+                      style={[
+                        styles.cell,
+                        isMobile && styles.cellMobile,
+                        { width: columns[1].width },
+                      ]}
+                    >
+                      <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
                         {row.engineeringPart}
                       </Text>
                     </View>
-                    <View style={[styles.cell, { width: columns[2].width }]}>
-                      <Text style={styles.cellText}>
+                    <View
+                      style={[
+                        styles.cell,
+                        isMobile && styles.cellMobile,
+                        { width: columns[2].width },
+                      ]}
+                    >
+                      <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
                         {row.steps.length}단계
                       </Text>
                     </View>
-                    <View style={[styles.cell, { width: columns[3].width }]}>
-                      <Text style={styles.cellText}>
+                    <View
+                      style={[
+                        styles.cell,
+                        isMobile && styles.cellMobile,
+                        { width: columns[3].width },
+                      ]}
+                    >
+                      <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
                         {row.employeeNames.length}명
                       </Text>
                     </View>
-                    <View style={[styles.cell, { width: columns[4].width }]}>
+                    <View
+                      style={[
+                        styles.cell,
+                        isMobile && styles.cellMobile,
+                        { width: columns[4].width },
+                      ]}
+                    >
                       <TouchableOpacity
-                        style={styles.detailButton}
+                        style={[
+                          styles.detailButton,
+                          isMobile && styles.detailButtonMobile,
+                        ]}
                         onPress={() => openDetail(row)}
                       >
-                        <Text style={styles.detailButtonText}>보기</Text>
-                        <Image source={showIcon} style={styles.detailButtonIcon} />
+                        <Text
+                          style={[
+                            styles.detailButtonText,
+                            isMobile && styles.detailButtonTextMobile,
+                          ]}
+                        >
+                          보기
+                        </Text>
+                        <Image
+                          source={showIcon}
+                          style={[
+                            styles.detailButtonIcon,
+                            isMobile && styles.detailButtonIconMobile,
+                          ]}
+                        />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -839,6 +904,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F3F4F6",
   },
+  pageMobile: {
+    gap: 12,
+  },
+  pageContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  pageContentMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 18,
+  },
   headerCard: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -846,6 +924,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
+  },
+  headerCardMobile: {
+    padding: 12,
+    marginBottom: 12,
   },
   pageTitle: { fontSize: 20, fontWeight: "700", color: "#0F172A" },
   pageSub: { fontSize: 12, color: "#64748B", marginTop: 6 },
@@ -856,6 +938,9 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     padding: 12,
     minHeight: 240,
+  },
+  tableCardMobile: {
+    padding: 10,
   },
   tableHeaderRow: {
     flexDirection: "row",
@@ -875,6 +960,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  headerActionsMobile: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 6,
   },
   countText: { fontSize: 12, color: "#64748B" },
   addBtn: {
@@ -907,9 +997,12 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#EEE" },
   cell: { padding: 12, justifyContent: "center" },
+  cellMobile: { paddingVertical: 8, paddingHorizontal: 8 },
   headerCell: { backgroundColor: "#F4F6F8" },
   headerText: { fontWeight: "600", color: "#0F172A" },
+  headerTextMobile: { fontSize: 12 },
   cellText: { color: "#333" },
+  cellTextMobile: { fontSize: 12 },
   detailButton: {
     paddingVertical: 6,
     paddingHorizontal: 10,
@@ -921,8 +1014,15 @@ const styles = StyleSheet.create({
     gap: 6,
     justifyContent: "space-between",
   },
+  detailButtonMobile: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 4,
+  },
   detailButtonText: { fontSize: 12, color: "#0F172A" },
+  detailButtonTextMobile: { fontSize: 11 },
   detailButtonIcon: { width: 14, height: 14, resizeMode: "contain" },
+  detailButtonIconMobile: { width: 12, height: 12 },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",

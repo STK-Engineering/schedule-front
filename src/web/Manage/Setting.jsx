@@ -223,7 +223,8 @@ function ensureGeneral(values) {
 }
 
 export default function Setting() {
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 800;
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -586,11 +587,11 @@ export default function Setting() {
       {columns.map((col) => (
         <TouchableOpacity
           key={col.key}
-          style={[styles.cell, { width: col.width }]}
+          style={[styles.cell, isMobile && styles.cellMobile, { width: col.width }]}
           activeOpacity={0.7}
           onPress={() => col.sortable && handleSort(col.key)}
         >
-          <Text style={styles.headerText}>
+          <Text style={[styles.headerText, isMobile && styles.headerTextMobile]}>
             {col.title}
             {sort.key === col.key && (
               <Text style={styles.sortIcon}>
@@ -634,9 +635,12 @@ export default function Setting() {
     return (
       <View style={styles.row}>
         {columns.map((col) => (
-          <View key={col.key} style={[styles.cell, { width: col.width }]}>
+          <View
+            key={col.key}
+            style={[styles.cell, isMobile && styles.cellMobile, { width: col.width }]}
+          >
             {col.key === "department" ? (
-              <Text style={styles.cellText}>
+              <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
                 {(() => {
                   const deptId = item?.departmentId ?? item?.department?.id;
                   const deptLabel = DEPARTMENTS.find(
@@ -646,7 +650,7 @@ export default function Setting() {
                 })()}
               </Text>
             ) : col.key === "engineeringPart" ? (
-              <Text style={styles.cellText}>
+              <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
                 {(() => {
                   const deptId = item?.departmentId ?? item?.department?.id;
                   if (deptId !== ENGINEERING_DEPT_ID) return "-";
@@ -654,16 +658,25 @@ export default function Setting() {
                 })()}
               </Text>
             ) : col.key === "status" ? (
-              <Text style={styles.cellText}>{statusLabel(item.status)}</Text>
+              <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
+                {statusLabel(item.status)}
+              </Text>
             ) : col.key === "actions" ? (
               <TouchableOpacity
-                style={styles.moreButton}
+                style={[styles.moreButton, isMobile && styles.moreButtonMobile]}
                 onPress={() => openActionMenu(item)}
               >
-                <Text style={styles.moreButtonText}>⋮</Text>
+                <Text
+                  style={[
+                    styles.moreButtonText,
+                    isMobile && styles.moreButtonTextMobile,
+                  ]}
+                >
+                  ⋮
+                </Text>
               </TouchableOpacity>
             ) : (
-              <Text style={styles.cellText}>
+              <Text style={[styles.cellText, isMobile && styles.cellTextMobile]}>
                 {typeof item[col.key] === "object"
                   ? item[col.key]?.name
                   : item[col.key]}
@@ -711,11 +724,12 @@ export default function Setting() {
     return true;
   });
 
-  const TABLE_MAX_HEIGHT = 520;
+  const TABLE_MAX_HEIGHT = isMobile ? 360 : 520;
   const tableHeight = Math.min(
     TABLE_MAX_HEIGHT,
-    Math.max(320, windowHeight - 360),
+    Math.max(240, windowHeight - (isMobile ? 380 : 360)),
   );
+  const tableMinWidth = isMobile ? 1200 : "100%";
 
   const breadcrumb = [
     { label: "홈", route: "Home" },
@@ -727,10 +741,13 @@ export default function Setting() {
     <PageLayout
       breadcrumb={breadcrumb}
       scroll={false}
-      contentStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+      contentStyle={[
+        styles.pageContent,
+        isMobile && styles.pageContentMobile,
+      ]}
     >
-      <View style={styles.page}>
-      <View style={styles.filterCard}>
+      <View style={[styles.page, isMobile && styles.pageMobile]}>
+      <View style={[styles.filterCard, isMobile && styles.filterCardMobile]}>
         <View style={styles.titleRow}>
           <View>
             <Text style={styles.title}>
@@ -746,7 +763,7 @@ export default function Setting() {
 
         {!!error && <Text style={{ color: "red" }}>{error}</Text>}
 
-        <View style={styles.filterRow}>
+        <View style={[styles.filterRow, isMobile && styles.filterRowMobile]}>
           <View style={[styles.filterGroup, styles.filterGroupOffset]}>
             <Text style={styles.filterLabel}>부서 필터</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -803,7 +820,7 @@ export default function Setting() {
         </View>
 
         {filterDepartments.includes(ENGINEERING_DEPT_ID) && (
-          <View style={styles.filterRow}>
+          <View style={[styles.filterRow, isMobile && styles.filterRowMobile]}>
             <View style={styles.filterGroup}>
               <Text style={styles.filterLabel}>ENGINEERING 구분</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -860,7 +877,7 @@ export default function Setting() {
         )}
       </View>
 
-      <View style={styles.tableCard}>
+      <View style={[styles.tableCard, isMobile && styles.tableCardMobile]}>
         <View style={styles.tableHeaderRow}>
           <Text style={styles.tableTitle}>직원 목록</Text>
           <TouchableOpacity style={styles.addBtn} onPress={openCreateModal}>
@@ -872,7 +889,12 @@ export default function Setting() {
           showsHorizontalScrollIndicator
           contentContainerStyle={styles.tableScrollContent}
         >
-          <View style={[styles.tableWrap, { height: tableHeight }]}>
+          <View
+            style={[
+              styles.tableWrap,
+              { height: tableHeight, minWidth: tableMinWidth },
+            ]}
+          >
             <View style={{ flex: 1 }}>
               {renderHeader()}
               <FlatList
@@ -1285,6 +1307,19 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 16,
   },
+  pageMobile: {
+    gap: 12,
+  },
+  pageContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  pageContentMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 18,
+  },
   filterCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -1293,8 +1328,15 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 14,
   },
+  filterCardMobile: {
+    padding: 12,
+    gap: 12,
+  },
   filterRow: {
     gap: 8,
+  },
+  filterRowMobile: {
+    gap: 10,
   },
   filterRowLine: {
     flexDirection: "row",
@@ -1370,6 +1412,9 @@ const styles = StyleSheet.create({
     padding: 12,
     minHeight: 240,
   },
+  tableCardMobile: {
+    padding: 10,
+  },
   tableScrollContent: {
     minWidth: "100%",
   },
@@ -1400,11 +1445,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  moreButtonMobile: {
+    width: 32,
+    height: 26,
+  },
   moreButtonText: {
     fontSize: 18,
     lineHeight: 18,
     color: "#0F172A",
     fontWeight: "700",
+  },
+  moreButtonTextMobile: {
+    fontSize: 16,
+    lineHeight: 16,
   },
 
   headerRow: {
@@ -1416,9 +1469,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", borderBottomWidth: 1, borderColor: "#EEE" },
 
   cell: { padding: 12, justifyContent: "center" },
+  cellMobile: { paddingVertical: 8, paddingHorizontal: 8 },
   headerCell: { backgroundColor: "#F4F6F8" },
   headerText: { fontWeight: "600" },
+  headerTextMobile: { fontSize: 12 },
   cellText: { color: "#333" },
+  cellTextMobile: { fontSize: 12 },
 
   sortIcon: { fontSize: 12, marginLeft: 4, color: "#666", fontWeight: "500" },
 

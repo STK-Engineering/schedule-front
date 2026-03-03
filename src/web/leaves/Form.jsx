@@ -143,6 +143,7 @@ export default function Form() {
   const { bump } = useContext(LeaveBalanceContext);
   const { width } = useWindowDimensions();
   const isNarrow = width < 1024;
+  const isMobile = width < 800;
 
   const [leaveType, setLeaveType] = useState("연차");
   const [startDate, setStartDate] = useState("");
@@ -157,6 +158,17 @@ export default function Form() {
   const [employee, setEmployee] = useState({ name: "", department: "" });
   const [holidayDateSet, setHolidayDateSet] = useState(new Set());
   const preselectLeaveType = route?.params?.preselectLeaveType;
+  const dateInputStyle = isMobile
+    ? {
+        ...htmlInputStyle,
+        minWidth: "100%",
+        width: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        fontSize: 13,
+        padding: "10px 12px",
+      }
+    : htmlInputStyle;
 
   useEffect(() => {
     if (!preselectLeaveType) return;
@@ -429,19 +441,24 @@ export default function Form() {
         contentContainerStyle={[
           styles.pageWrap,
           isNarrow && styles.pageWrapStack,
+          isMobile && styles.pageWrapMobile,
         ]}
       >
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>휴가 신청</Text>
-          <Text style={styles.pageSub}>
+        <View style={[styles.pageHeader, isMobile && styles.pageHeaderMobile]}>
+          <Text style={[styles.pageTitle, isMobile && styles.pageTitleMobile]}>
+            휴가 신청
+          </Text>
+          <Text style={[styles.pageSub, isMobile && styles.pageSubMobile]}>
             휴가 신청서를 작성하고 제출해 주세요.
           </Text>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, isMobile && styles.cardMobile]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>신청 정보</Text>
-            <Text style={styles.sectionSub}>
+            <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>
+              신청 정보
+            </Text>
+            <Text style={[styles.sectionSub, isMobile && styles.sectionSubMobile]}>
               * 표시는 필수 항목입니다.
             </Text>
           </View>
@@ -449,15 +466,22 @@ export default function Form() {
 
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldGroupTitle}>* 휴가 유형</Text>
-            <View style={styles.fieldRow}>
-              <View style={[styles.fieldItem, styles.fieldItemFull]}>
-                <View style={styles.leaveTypeRow}>
+            <View style={[styles.fieldRow, isMobile && styles.fieldRowMobile]}>
+              <View
+                style={[
+                  styles.fieldItem,
+                  styles.fieldItemFull,
+                  isMobile && styles.fieldItemMobile,
+                ]}
+              >
+                <View style={[styles.leaveTypeRow, isMobile && styles.leaveTypeRowMobile]}>
                   {["연차", "오전반차", "오후반차", "경조사", "기타"].map(
                     (item) => (
                       <TouchableOpacity
                         key={item}
                         style={[
                           styles.leaveTypeButton,
+                          isMobile && styles.leaveTypeButtonMobile,
                           leaveType === item && styles.leaveTypeButtonActive,
                         ]}
                         onPress={() => {
@@ -469,6 +493,7 @@ export default function Form() {
                         <Text
                           style={[
                             styles.leaveTypeText,
+                            isMobile && styles.leaveTypeTextMobile,
                             leaveType === item && styles.leaveTypeTextActive,
                           ]}
                         >
@@ -484,13 +509,15 @@ export default function Form() {
 
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldGroupTitle}>기간</Text>
-            <View style={styles.fieldRow}>
+            <View style={[styles.fieldRow, isMobile && styles.fieldRowMobile]}>
               {isHalfDay || isHealthCheck ? (
-                <View style={styles.fieldItem}>
-                  <Text style={styles.fieldLabel}>* 요청일자</Text>
+                <View style={[styles.fieldItem, isMobile && styles.fieldItemMobile]}>
+                  <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+                    * 요청일자
+                  </Text>
                   <input
                     type="date"
-                    style={htmlInputStyle}
+                    style={dateInputStyle}
                     value={startDate}
                     onChange={(e) => {
                       setStartDate(e.target.value);
@@ -500,20 +527,24 @@ export default function Form() {
                 </View>
               ) : (
                 <>
-                  <View style={styles.fieldItem}>
-                    <Text style={styles.fieldLabel}>* 시작일</Text>
+                  <View style={[styles.fieldItem, isMobile && styles.fieldItemMobile]}>
+                    <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+                      * 시작일
+                    </Text>
                     <input
                       type="date"
-                      style={htmlInputStyle}
+                      style={dateInputStyle}
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
                     />
                   </View>
-                  <View style={styles.fieldItem}>
-                    <Text style={styles.fieldLabel}>* 종료일</Text>
+                  <View style={[styles.fieldItem, isMobile && styles.fieldItemMobile]}>
+                    <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+                      * 종료일
+                    </Text>
                     <input
                       type="date"
-                      style={htmlInputStyle}
+                      style={dateInputStyle}
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       max={maxEndDate}
@@ -534,6 +565,7 @@ export default function Form() {
                       <TouchableOpacity
                         style={[
                           styles.reasonOptionButton,
+                          isMobile && styles.reasonOptionButtonMobile,
                           reason === option && styles.reasonOptionButtonActive,
                         ]}
                         onPress={() => setReason(option)}
@@ -541,6 +573,7 @@ export default function Form() {
                         <Text
                           style={[
                             styles.reasonOptionText,
+                            isMobile && styles.reasonOptionTextMobile,
                             reason === option && styles.reasonOptionTextActive,
                           ]}
                         >
@@ -560,7 +593,7 @@ export default function Form() {
                 )}
                   {leaveType === "경조사" ? (
                 <View style={styles.reasonHintRow}>
-                  <Text style={styles.reasonHint}>
+                  <Text style={[styles.reasonHint, isMobile && styles.reasonHintMobile]}>
                     *사유(최대 사용가능 일자) / 출산(20일)을 제외한 모든
                     경조사는 주말, 공휴일이 포함되어 계산됩니다.
                   </Text>
@@ -572,7 +605,11 @@ export default function Form() {
                 placeholder="사유를 입력하세요"
                 value={reason}
                 onChangeText={setReason}
-                style={[styles.input, styles.textAreaShort]}
+                style={[
+                  styles.input,
+                  styles.textAreaShort,
+                  isMobile && styles.inputMobile,
+                ]}
                 multiline
               />
             )}
@@ -584,29 +621,40 @@ export default function Form() {
               placeholder="기타 사항을 입력하세요"
               value={etc}
               onChangeText={setEtc}
-              style={[styles.input, styles.textArea]}
+              style={[
+                styles.input,
+                styles.textArea,
+                isMobile && styles.inputMobile,
+              ]}
               multiline
             />
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, isMobile && styles.cardMobile]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>미리보기</Text>
-            <Text style={styles.sectionSub}>
+            <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>
+              미리보기
+            </Text>
+            <Text style={[styles.sectionSub, isMobile && styles.sectionSubMobile]}>
               작성한 신청 내용을 요약해 보여줍니다.
             </Text>
           </View>
           <View style={styles.sectionDivider} />
 
-          <View style={styles.previewHeader}>
+          <View style={[styles.previewHeader, isMobile && styles.previewHeaderMobile]}>
             <View>
-              <Text style={styles.previewTitle}>휴가 사용 신청서</Text>
-              <Text style={styles.previewSub}>작성한 내용을 확인하세요.</Text>
+              <Text style={[styles.previewTitle, isMobile && styles.previewTitleMobile]}>
+                휴가 사용 신청서
+              </Text>
+              <Text style={[styles.previewSub, isMobile && styles.previewSubMobile]}>
+                작성한 내용을 확인하세요.
+              </Text>
             </View>
             <View
               style={[
                 styles.statusPill,
+                isMobile && styles.statusPillMobile,
                 { backgroundColor: STATUS_STYLE["대기"].bg },
               ]}
             >
@@ -619,6 +667,7 @@ export default function Form() {
               <Text
                 style={[
                   styles.statusText,
+                  isMobile && styles.statusTextMobile,
                   { color: STATUS_STYLE["대기"].text },
                 ]}
               >
@@ -627,7 +676,7 @@ export default function Form() {
             </View>
           </View>
 
-          <View style={styles.previewTable}>
+          <View style={[styles.previewTable, isMobile && styles.previewTableMobile]}>
             <PreviewRow label="소속" value={employee.department || "-"} />
             <PreviewRow label="성명" value={employee.name || "-"} />
             <PreviewRow label="휴가형태" value={leaveType || "-"} />
@@ -668,16 +717,24 @@ export default function Form() {
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, isMobile && styles.cardMobile]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>최종 확인</Text>
-            <Text style={styles.sectionSub}>
+            <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>
+              최종 확인
+            </Text>
+            <Text style={[styles.sectionSub, isMobile && styles.sectionSubMobile]}>
               입력 내용 확인 후 제출해 주세요.
             </Text>
           </View>
           <View style={styles.sectionDivider} />
 
-          <View style={[styles.check, isNarrow && styles.checkCompact]}>
+          <View
+            style={[
+              styles.check,
+              isNarrow && styles.checkCompact,
+              isMobile && styles.checkMobile,
+            ]}
+          >
             <Checkbox
               style={styles.checkbox}
               value={isChecked}
@@ -691,20 +748,26 @@ export default function Form() {
               color={isFormValid ? "#121D6D" : "#b7b7b7"}
             />
             <View style={styles.checkTextWrap}>
-              <Text style={styles.checkText}>
+              <Text style={[styles.checkText, isMobile && styles.checkTextMobile]}>
                 위의 내용에 오탈자, 틀린 내용이 없는 지 최종적으로 확인 후,
                 체크란을 클릭해주세요.
               </Text>
-              <Text style={styles.checkWarn}>
+              <Text style={[styles.checkWarn, isMobile && styles.checkWarnMobile]}>
                 *휴가 사용 신청서는 사용 일자로부터 하루 전까지 취소와 수정이
                 가능합니다.
               </Text>
             </View>
           </View>
 
-          <View style={[styles.alert, isNarrow && styles.alertCompact]}>
+          <View
+            style={[
+              styles.alert,
+              isNarrow && styles.alertCompact,
+              isMobile && styles.alertMobile,
+            ]}
+          >
             {attemptedCheck && !isFormValid && (
-              <Text style={{ color: "red", fontSize: 12 }}>
+              <Text style={{ color: "red", fontSize: isMobile ? 11 : 12 }}>
                 필수 항목을 모두 입력해주세요.
               </Text>
             )}
@@ -725,7 +788,7 @@ export default function Form() {
               onPress={sendDateForm}
               disabled={!isChecked || !isFormValid}
             >
-              <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+              <Text style={{ color: "white", fontSize: isMobile ? 14 : 16, fontWeight: "600" }}>
                 확인
               </Text>
             </TouchableOpacity>
@@ -736,7 +799,9 @@ export default function Form() {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>뒤로</Text>
+          <Text style={[styles.backButtonText, isMobile && styles.backButtonTextMobile]}>
+            뒤로
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </PageLayout>
@@ -744,15 +809,30 @@ export default function Form() {
 }
 
 function PreviewRow({ label, value, multiline = false, valueStyle }) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 800;
   return (
     <View style={styles.tableRow}>
-      <View style={styles.tableLabelCell}>
-        <Text style={styles.tableLabel}>{label}</Text>
+      <View
+        style={[
+          styles.tableLabelCell,
+          isMobile && styles.tableLabelCellMobile,
+        ]}
+      >
+        <Text style={[styles.tableLabel, isMobile && styles.tableLabelMobile]}>
+          {label}
+        </Text>
       </View>
-      <View style={styles.tableValueCell}>
+      <View
+        style={[
+          styles.tableValueCell,
+          isMobile && styles.tableValueCellMobile,
+        ]}
+      >
         <Text
           style={[
             styles.tableValue,
+            isMobile && styles.tableValueMobile,
             multiline && styles.tableValueMultiline,
             valueStyle,
           ]}
@@ -778,6 +858,10 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
   },
+  pageWrapMobile: {
+    padding: 12,
+    gap: 12,
+  },
   pageHeader: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -785,15 +869,24 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 18,
   },
+  pageHeaderMobile: {
+    padding: 14,
+  },
   pageTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: "#0F172A",
   },
+  pageTitleMobile: {
+    fontSize: 18,
+  },
   pageSub: {
     fontSize: 12,
     color: "#64748B",
     marginTop: 6,
+  },
+  pageSubMobile: {
+    fontSize: 11,
   },
   card: {
     backgroundColor: "#FFFFFF",
@@ -807,6 +900,10 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
   },
+  cardMobile: {
+    padding: 14,
+    gap: 8,
+  },
   sectionHeader: {
     marginBottom: 6,
   },
@@ -815,10 +912,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#0F172A",
   },
+  sectionTitleMobile: {
+    fontSize: 15,
+  },
   sectionSub: {
     fontSize: 12,
     color: "#64748B",
     marginTop: 4,
+  },
+  sectionSubMobile: {
+    fontSize: 11,
   },
   sectionDivider: {
     height: 1,
@@ -841,9 +944,18 @@ const styles = StyleSheet.create({
     gap: 14,
     flexWrap: "wrap",
   },
+  fieldRowMobile: {
+    flexDirection: "column",
+    gap: 10,
+    width: "100%",
+  },
   fieldItem: {
     flexGrow: 1,
     minWidth: 200,
+  },
+  fieldItemMobile: {
+    minWidth: 0,
+    width: "100%",
   },
   fieldItemFull: {
     minWidth: "100%",
@@ -852,6 +964,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#64748B",
     marginBottom: 8,
+  },
+  fieldLabelMobile: {
+    fontSize: 11,
   },
   input: {
     paddingVertical: 11,
@@ -863,6 +978,9 @@ const styles = StyleSheet.create({
     cursor: "pointer",
     minWidth: 180,
     flexGrow: 1,
+  },
+  inputMobile: {
+    paddingVertical: 10,
   },
   textAreaShort: {
     height: 90,
@@ -900,6 +1018,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     rowGap: 8,
   },
+  leaveTypeRowMobile: {
+    rowGap: 6,
+    flexDirection: "column",
+  },
   leaveTypeButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -908,6 +1030,12 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     marginRight: 10,
   },
+  leaveTypeButtonMobile: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginRight: 0,
+    width: "100%",
+  },
   leaveTypeButtonActive: {
     backgroundColor: "#121D6D",
     borderColor: "#121D6D",
@@ -915,6 +1043,9 @@ const styles = StyleSheet.create({
   leaveTypeText: {
     fontSize: 14,
     color: "#475569",
+  },
+  leaveTypeTextMobile: {
+    fontSize: 13,
   },
   leaveTypeTextActive: {
     color: "white",
@@ -933,6 +1064,10 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     backgroundColor: "white",
   },
+  reasonOptionButtonMobile: {
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
   reasonOptionButtonActive: {
     backgroundColor: "#121D6D",
     borderColor: "#121D6D",
@@ -940,6 +1075,9 @@ const styles = StyleSheet.create({
   reasonOptionText: {
     fontSize: 14,
     color: "#475569",
+  },
+  reasonOptionTextMobile: {
+    fontSize: 12,
   },
   reasonOptionTextActive: {
     color: "white",
@@ -956,6 +1094,9 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontSize: 12,
   },
+  reasonHintMobile: {
+    fontSize: 11,
+  },
   check: {
     marginTop: 8,
     padding: 15,
@@ -971,6 +1112,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "start",
     flexWrap: "wrap",
+  },
+  checkMobile: {
+    padding: 12,
   },
   checkCompact: {
     marginLeft: 0,
@@ -1003,10 +1147,16 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     flexShrink: 1,
   },
+  checkTextMobile: {
+    fontSize: 11.5,
+  },
   checkWarn: {
     color: "red",
     fontSize: 12,
     flexShrink: 1,
+  },
+  checkWarnMobile: {
+    fontSize: 11,
   },
   previewHeader: {
     flexDirection: "row",
@@ -1014,15 +1164,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+  previewHeaderMobile: {
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 8,
+  },
   previewTitle: {
     fontSize: 16,
     fontWeight: "700",
     color: "#0F172A",
   },
+  previewTitleMobile: {
+    fontSize: 15,
+  },
   previewSub: {
     fontSize: 12,
     color: "#64748B",
     marginTop: 4,
+  },
+  previewSubMobile: {
+    fontSize: 11,
   },
   statusPill: {
     paddingHorizontal: 12,
@@ -1033,6 +1194,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
   },
+  statusPillMobile: {
+    height: 24,
+    paddingHorizontal: 10,
+  },
   statusDot: {
     width: 8,
     height: 8,
@@ -1040,11 +1205,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#0F172A",
   },
   statusText: { fontSize: 12, fontWeight: "600", color: "#0F172A" },
+  statusTextMobile: { fontSize: 11 },
   previewTable: {
     borderWidth: 1,
     borderColor: "#E2E8F0",
     borderRadius: 10,
     overflow: "hidden",
+  },
+  previewTableMobile: {
+    borderRadius: 8,
   },
   tableRow: {
     flexDirection: "row",
@@ -1072,4 +1241,19 @@ const styles = StyleSheet.create({
   tableValue: { fontSize: 14, color: "#0F172A", lineHeight: 20 },
   tableValueMultiline: { lineHeight: 20 },
   balanceNotice: { color: "#64748B" },
+  tableLabelCellMobile: {
+    width: 110,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  tableValueCellMobile: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  tableLabelMobile: { fontSize: 11 },
+  tableValueMobile: { fontSize: 13 },
+  backButtonTextMobile: { fontSize: 12 },
+  alertMobile: {
+    alignItems: "flex-start",
+  },
 });

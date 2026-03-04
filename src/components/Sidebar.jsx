@@ -16,7 +16,7 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
   const { width } = useWindowDimensions();
   const isMobile = width < 800;
   const panelWidth = Math.min(260, Math.max(200, Math.floor(width * 0.72)));
-  const { setIsLoggedIn } = useContext(AuthContext) ?? {};
+  const { isLoggedIn } = useContext(AuthContext) ?? {};
   const [authorities, setAuthorities] = useState([]);
   const [isLoggedOut, setIsLoggedOut] = useState(false);
   const [openSections, setOpenSections] = useState({
@@ -29,6 +29,13 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
     let mounted = true;
 
     const fetchMe = async () => {
+      if (!isLoggedIn) {
+        if (!mounted) return;
+        setAuthorities([]);
+        setIsLoggedOut(true);
+        return;
+      }
+
       try {
         const res = await api.get("/employees/me");
         const data = res.data;
@@ -71,7 +78,7 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (collapsed) {

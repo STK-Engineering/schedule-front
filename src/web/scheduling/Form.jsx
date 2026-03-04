@@ -15,6 +15,9 @@ import PageLayout from "../../components/PageLayout";
 import api from "../../api/api";
 import Checkbox from "expo-checkbox";
 
+const FIELD_LABEL_COLOR = "#0F172A";
+const PLACEHOLDER_COLOR = "#94A3B8";
+
 const htmlInputStyle = {
   padding: "11px 12px",
   border: "1px solid #E2E8F0",
@@ -511,7 +514,7 @@ export default function Form() {
 
     return (
       <View style={styles.fieldItem}>
-        <Text style={styles.fieldLabel}>* 엔지니어 성함</Text>
+        <Text style={styles.fieldLabel}>* Engineer</Text>
         <View style={styles.engineerSelectWrap}>
           <select
             style={htmlInputStyle}
@@ -559,6 +562,7 @@ export default function Form() {
           {showExternal && (
             <TextInput
               placeholder="외부 엔지니어 이름 입력 후 Enter"
+              placeholderTextColor={PLACEHOLDER_COLOR}
               value={engineerInput}
               onChangeText={setEngineerInput}
               onSubmitEditing={() => {
@@ -733,10 +737,9 @@ export default function Form() {
           <View style={styles.sectionDivider} />
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>작업 정보</Text>
             <View style={styles.fieldRow}>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 작업 번호(Job Number)</Text>
+                <Text style={styles.fieldLabel}>* Job Number</Text>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={openJobSearch}
@@ -744,6 +747,7 @@ export default function Form() {
                   <View pointerEvents="none">
                     <TextInput
                       placeholder="작업 번호 검색"
+                      placeholderTextColor={PLACEHOLDER_COLOR}
                       value={jobNumber}
                       editable={false}
                       style={styles.input}
@@ -752,9 +756,10 @@ export default function Form() {
                 </TouchableOpacity>
               </View>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 고객사명</Text>
+                <Text style={styles.fieldLabel}>* Customer</Text>
                 <TextInput
                   placeholder="예: 에스티케이엔지니어링 주식회사"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={customer}
                   onChangeText={setCustomer}
                   style={styles.input}
@@ -763,27 +768,42 @@ export default function Form() {
             </View>
             <View style={[styles.fieldRow, styles.fieldRowSpaced]}>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>고유 번호(IMO Number)</Text>
+                <Text style={styles.fieldLabel}>IMO Number</Text>
                 <TextInput
                   placeholder="예: 1234567"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={imoNumber}
                   onChangeText={setImoNumber}
                   style={styles.input}
                 />
               </View>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>호선명</Text>
+                <Text style={styles.fieldLabel}>* Region</Text>
+                <TextInput
+                  placeholder="예: 대한민국"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
+                  value={region}
+                  onChangeText={setRegion}
+                  style={styles.input}
+                />
+              </View>
+            </View>
+            <View style={[styles.fieldRow, styles.fieldRowSpaced]}>
+              <View style={styles.fieldItem}>
+                <Text style={styles.fieldLabel}>Vessel Name</Text>
                 <TextInput
                   placeholder="예: HANJIN OCEAN 102"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={vesselName}
                   onChangeText={setVesselName}
                   style={styles.input}
                 />
               </View>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>호선 번호</Text>
+                <Text style={styles.fieldLabel}>Hull No</Text>
                 <TextInput
                   placeholder="예: HO-102"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={hullNo}
                   onChangeText={setHullNo}
                   style={styles.input}
@@ -793,43 +813,36 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>* 작업/종류/지역</Text>
-            <View style={[styles.fieldRow, styles.fieldRowSpaced]}>
+            <View style={styles.fieldRow}>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 작업</Text>
+                <Text style={styles.fieldLabel}>* Description</Text>
                 <TextInput
                   placeholder="예: COMMISSIONING"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={workType}
                   onChangeText={setWorkType}
                   style={styles.input}
                 />
               </View>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 종류</Text>
+                <Text style={styles.fieldLabel}>* System</Text>
                 <TextInput
                   placeholder="예: SERVICE"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={systemType}
                   onChangeText={setSystemType}
-                  style={styles.input}
-                />
-              </View>
-              <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 지역</Text>
-                <TextInput
-                  placeholder="예: 대한민국"
-                  value={region}
-                  onChangeText={setRegion}
                   style={styles.input}
                 />
               </View>
             </View>
           </View>
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>* Details of Service Request</Text>
             <View style={styles.fieldRow}>
               <View style={[styles.fieldItem, styles.fieldItemFull]}>
+                <Text style={styles.fieldLabel}>Details of Service Request</Text>
                 <TextInput
                   placeholder="작업 내용을 입력하세요"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={jobDescription}
                   onChangeText={setJobDescription}
                   style={[styles.input, styles.textArea]}
@@ -842,9 +855,9 @@ export default function Form() {
 
         <View style={styles.card}>
           <View style={styles.fieldGroup}>
-            <View style={styles.fieldGroupHeader}>
-              <Text style={styles.fieldGroupTitle}>1차 작업 일정</Text>
-              {showSecondRange && (
+            {showSecondRange && (
+              <View style={styles.fieldGroupHeader}>
+                <View />
                 <TouchableOpacity
                   style={styles.addSecondIconButton}
                   onPress={removeFirstSchedule}
@@ -852,11 +865,11 @@ export default function Form() {
                 >
                   <Text style={styles.addSecondIconText}>- 제거</Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              </View>
+            )}
             <View style={styles.fieldRow}>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 시작일</Text>
+                <Text style={styles.fieldLabel}>* Start Date</Text>
                 <input
                   type="date"
                   style={htmlInputStyle}
@@ -865,7 +878,7 @@ export default function Form() {
                 />
               </View>
               <View style={styles.fieldItem}>
-                <Text style={styles.fieldLabel}>* 종료일</Text>
+                <Text style={styles.fieldLabel}>* End Date</Text>
                 <input
                   type="date"
                   style={htmlInputStyle}
@@ -880,12 +893,12 @@ export default function Form() {
           <View style={styles.fieldGroup}>{renderEngineerSelect(1)}</View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>* 비고</Text>
             <View style={styles.fieldRow}>
               <View style={[styles.fieldItem, styles.fieldItemFull]}>
-                <Text style={styles.fieldLabel}>* 1차 비고</Text>
+                <Text style={styles.fieldLabel}>* Note</Text>
                 <TextInput
                   placeholder="예: ETA: 11월 12일 / ETB: 11월 13일~11월 15일 / ETD: 11월 16일"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={note1}
                   onChangeText={setNote1}
                   style={[styles.input, styles.textArea]}
@@ -914,7 +927,7 @@ export default function Form() {
           <View style={styles.card}>
             <View style={styles.fieldGroup}>
               <View style={styles.fieldGroupHeader}>
-                <Text style={styles.fieldGroupTitle}>2차 작업 일정</Text>
+                <View />
                 <TouchableOpacity
                   style={styles.addSecondIconButton}
                   onPress={() => {
@@ -935,7 +948,7 @@ export default function Form() {
               </View>
               <View style={styles.fieldRow}>
                 <View style={styles.fieldItem}>
-                  <Text style={styles.fieldLabel}>* 시작일</Text>
+                  <Text style={styles.fieldLabel}>* Start Date</Text>
                   <input
                     type="date"
                     style={htmlInputStyle}
@@ -944,7 +957,7 @@ export default function Form() {
                   />
                 </View>
                 <View style={styles.fieldItem}>
-                  <Text style={styles.fieldLabel}>* 종료일</Text>
+                  <Text style={styles.fieldLabel}>* End Date</Text>
                   <input
                     type="date"
                     style={htmlInputStyle}
@@ -957,12 +970,12 @@ export default function Form() {
             </View>
             <View style={styles.fieldGroup}>{renderEngineerSelect(2)}</View>
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldGroupTitle}>* 비고</Text>
               <View style={styles.fieldRow}>
                 <View style={[styles.fieldItem, styles.fieldItemFull]}>
-                  <Text style={styles.fieldLabel}>* 2차 비고</Text>
+                  <Text style={styles.fieldLabel}>* 비고(2차)</Text>
                   <TextInput
                     placeholder="예: ETA: 11월 12일 / ETB: 11월 13일~11월 15일 / ETD: 11월 16일"
+                    placeholderTextColor={PLACEHOLDER_COLOR}
                     value={note2}
                     onChangeText={setNote2}
                     style={[styles.input, styles.textArea]}
@@ -997,7 +1010,7 @@ export default function Form() {
             <PreviewRow label="Hull No" value={hullNo || "-"} />
             <PreviewRow label="Region" value={region || "-"} />
             <PreviewRow
-              label="요청일자"
+              label="Date"
               value={
                 startDate
                   ? `${startDate} ~ ${endDate}${
@@ -1011,7 +1024,7 @@ export default function Form() {
             <PreviewRow label="Description" value={workType || "-"} />
             <PreviewRow label="System" value={systemType || "-"} />
             <PreviewRow
-              label={showSecondRange ? "엔지니어(1차)" : "엔지니어"}
+              label={showSecondRange ? "Engineer(1차)" : "Engineer"}
               value={
                 [...selectedEngineers1, ...customEngineerNames1].length
                   ? [
@@ -1023,7 +1036,7 @@ export default function Form() {
             />
             {showSecondRange && (
               <PreviewRow
-                label="엔지니어(2차)"
+                label="Engineer(2차)"
                 value={
                   [...selectedEngineers2, ...customEngineerNames2].length
                     ? [
@@ -1035,12 +1048,12 @@ export default function Form() {
               />
             )}
             <PreviewRow
-              label={showSecondRange ? "비고(1차)" : "비고"}
+              label={showSecondRange ? "Note(1차)" : "Note"}
               value={note1 || "-"}
               multiline
             />
             {showSecondRange && (
-              <PreviewRow label="비고(2차)" value={note2 || "-"} multiline />
+              <PreviewRow label="Note(2차)" value={note2 || "-"} multiline />
             )}
             <PreviewRow
               label="Details of Service Request"
@@ -1145,6 +1158,7 @@ export default function Form() {
                 value={jobSearchKeyword}
                 onChangeText={setJobSearchKeyword}
                 placeholder="작업 번호를 입력하세요"
+                placeholderTextColor={PLACEHOLDER_COLOR}
                 style={styles.jobSearchInput}
                 autoCorrect={false}
                 autoCapitalize="none"
@@ -1301,13 +1315,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  fieldGroupTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#0F172A",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
   fieldRow: {
     flexDirection: "row",
     gap: 14,
@@ -1335,7 +1342,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 12,
-    color: "#64748B",
+    color: FIELD_LABEL_COLOR,
     marginBottom: 8,
   },
   addSecondRow: {
@@ -1381,6 +1388,7 @@ const styles = StyleSheet.create({
     cursor: "pointer",
     minWidth: 180,
     flexGrow: 1,
+    color: FIELD_LABEL_COLOR,
   },
   inputReadOnly: {
     backgroundColor: "#F8FAFC",
@@ -1469,6 +1477,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     backgroundColor: "#fff",
+    color: FIELD_LABEL_COLOR,
   },
   jobSearchButton: {
     height: 40,

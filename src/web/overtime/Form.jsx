@@ -35,6 +35,7 @@ const htmlInputStyle = {
   color: "#0F172A",
   outline: "none",
 };
+const PLACEHOLDER_COLOR = "#94A3B8";
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, idx) => {
   const totalMinutes = idx * 30;
@@ -413,12 +414,12 @@ export default function Form() {
           <View style={styles.sectionDivider} />
           
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>작업 정보</Text>
             <View style={styles.fieldRow}>
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 작업 번호(Job Number)</Text>
                 <TextInput
                   placeholder="예: STKP-26000203"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={jobNumber}
                   onChangeText={setJobNumber}
                   style={styles.input}
@@ -428,6 +429,7 @@ export default function Form() {
                 <Text style={styles.fieldLabel}>호선명</Text>
                 <TextInput
                   placeholder="예: HANJIN OCEAN 102"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={vesselName}
                   onChangeText={setVesselName}
                   style={styles.input}
@@ -437,6 +439,7 @@ export default function Form() {
                 <Text style={styles.fieldLabel}>호선 번호</Text>
                 <TextInput
                   placeholder="예: HO-102"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={hullNo}
                   onChangeText={setHullNo}
                   style={styles.input}
@@ -446,7 +449,6 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>작업 일정</Text>
             <View style={styles.fieldRow}>
               <View style={styles.fieldItem}>
                 <Text style={styles.fieldLabel}>* 요청일자</Text>
@@ -488,8 +490,7 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>이미지 첨부</Text>
-
+            <Text style={styles.fieldLabel}>이미지</Text>
             {Platform.OS === "web" ? (
               <div
                 onDragEnter={handleImageDragEnter}
@@ -607,11 +608,12 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>* 작업 내용</Text>
             <View style={styles.fieldRow}>
               <View style={[styles.fieldItem, styles.fieldItemFull]}>
+                <Text style={styles.fieldLabel}>* 작업 내용</Text>
                 <TextInput
                   placeholder="작업 내용을 입력하세요"
+                  placeholderTextColor={PLACEHOLDER_COLOR}
                   value={jobDescription}
                   onChangeText={setJobDescription}
                   style={[styles.input, styles.textArea]}
@@ -887,14 +889,6 @@ const styles = StyleSheet.create({
   },
   fieldGroup: {
     paddingVertical: 6,
-  },
-  fieldGroupTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 10,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
   },
   imageAttachPanel: {
     borderWidth: 1,

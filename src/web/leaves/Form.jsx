@@ -33,6 +33,7 @@ const htmlInputStyle = {
   color: "#0F172A",
   outline: "none",
 };
+const PLACEHOLDER_COLOR = "#94A3B8";
 
 function toDateOnly(dateStr) {
   if (!dateStr) return null;
@@ -269,7 +270,7 @@ export default function Form() {
     };
 
     try {
-      const endpoint = isSpouseMaternity ? "/spouse-maternity" : "/leaves";
+      const endpoint = isSpouseMaternity ? "/paternity-leave" : "/leaves";
       const response = await api.post(endpoint, payload);
       console.log("신청 성공", response.data);
       bump();
@@ -412,7 +413,7 @@ export default function Form() {
 
     const fetchSpouseMaternity = async () => {
       try {
-        const res = await api.get("/spouse-maternity");
+        const res = await api.get("/paternity-leave");
         const data = res.data ?? {};
         const list = Array.isArray(data) ? data : [data];
         const eligible = list.some(
@@ -465,7 +466,6 @@ export default function Form() {
           <View style={styles.sectionDivider} />
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>* 휴가 유형</Text>
             <View style={[styles.fieldRow, isMobile && styles.fieldRowMobile]}>
               <View
                 style={[
@@ -474,6 +474,9 @@ export default function Form() {
                   isMobile && styles.fieldItemMobile,
                 ]}
               >
+                <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+                  * 휴가 유형
+                </Text>
                 <View style={[styles.leaveTypeRow, isMobile && styles.leaveTypeRowMobile]}>
                   {["연차", "오전반차", "오후반차", "경조사", "기타"].map(
                     (item) => (
@@ -508,7 +511,6 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>기간</Text>
             <View style={[styles.fieldRow, isMobile && styles.fieldRowMobile]}>
               {isHalfDay || isHealthCheck ? (
                 <View style={[styles.fieldItem, isMobile && styles.fieldItemMobile]}>
@@ -556,7 +558,9 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>* 사유</Text>
+            <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+              * 사유
+            </Text>
             {leaveType === "경조사" || leaveType === "기타" ? (
               <View style={styles.reasonOptionsRow}>
                 {(leaveType === "경조사" ? condolenceReasons : etcReasons).map(
@@ -603,6 +607,7 @@ export default function Form() {
             ) : (
               <TextInput
                 placeholder="사유를 입력하세요"
+                placeholderTextColor={PLACEHOLDER_COLOR}
                 value={reason}
                 onChangeText={setReason}
                 style={[
@@ -616,9 +621,12 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldGroupTitle}>기타 사항</Text>
+            <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+              기타 사항
+            </Text>
             <TextInput
               placeholder="기타 사항을 입력하세요"
+              placeholderTextColor={PLACEHOLDER_COLOR}
               value={etc}
               onChangeText={setEtc}
               style={[
@@ -930,14 +938,6 @@ const styles = StyleSheet.create({
   },
   fieldGroup: {
     paddingVertical: 6,
-  },
-  fieldGroupTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 10,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
   },
   fieldRow: {
     flexDirection: "row",

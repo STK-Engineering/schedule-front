@@ -395,7 +395,7 @@ function Item({ item, onDeleted, holidayDateSet, listType }) {
     try {
       const endpoint =
         item.type === "경조사" && item.reason?.startsWith("출산")
-          ? `/spouse-maternity/${item.id}`
+          ? `/paternity-leave/${item.id}`
           : `/leaves/${item.id}`;
       await api.delete(endpoint);
       Alert.alert("완료", "휴가 신청이 취소되었습니다.");

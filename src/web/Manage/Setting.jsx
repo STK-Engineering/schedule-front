@@ -563,7 +563,7 @@ export default function Setting() {
     }
 
     try {
-      await api.post("/spouse-maternity/birth", {
+      await api.post("/paternity-leave/birth", {
         employeeId: birthEmployeeId,
         birthDate,
       });

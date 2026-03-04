@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -223,6 +223,7 @@ function scheduleToEvents(item, currentUserKey) {
             name: engineerName || "엔지니어",
             department: { name: departmentName ?? "" },
           },
+          scheduleSource: item,
           schedule: {
             id:
               schedule?.id ??
@@ -432,6 +433,7 @@ const moveByMode = (date, mode, step) => {
 };
 
 export default function Schedule() {
+  const navigation = useNavigation();
   const route = useRoute();
   const { width, height } = useWindowDimensions();
   const isMobile = width < 800;
@@ -457,6 +459,8 @@ export default function Schedule() {
     normalizeForMode(new Date(), "month")
   );
 
+  const [currentUser, setCurrentUser] = useState({ name: "", department: "" });
+  const [authorities, setAuthorities] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -522,6 +526,46 @@ export default function Schedule() {
     setSelectedEvent(null);
   };
 
+  const handleEditDetail = () => {
+    if (!detail) return;
+    if (canEditSchedule) {
+      const source = detail?.scheduleSource ?? null;
+      closeEventModal();
+      navigation.navigate("SchedulingForm", {
+        mode: "edit",
+        source,
+      });
+      return;
+    }
+    if (canEditOvertime) {
+      closeEventModal();
+      navigation.navigate("OverTimeEdit", {
+        id: detail.id,
+        jobNumber: detail.jobNumber,
+        vesselName: detail.vesselName,
+        hullNo: detail.hullNo,
+        jobDescription: detail.jobDescription,
+        requestDate: detail.requestDate,
+        startTime: detail.startTime,
+        endTime: detail.endTime,
+        imageUrl: detail.imageUrl,
+      });
+      return;
+    }
+    if (canEditLeave) {
+      closeEventModal();
+      navigation.navigate("LeaveEdit", {
+        id: detail.id,
+        leaveType: detail.type ?? detail.leaveType,
+        startDate: detail.startDate,
+        endDate: detail.endDate,
+        reason: detail.reason,
+        etc: detail.etc,
+        status: detail.approvalStatusDisplay ?? detail.approvalStatus,
+      });
+    }
+  };
+
   const closeDayEventsModal = () => {
     setDayEventsModalOpen(false);
     setDayEvents([]);
@@ -539,11 +583,50 @@ export default function Schedule() {
 
   const detail = selectedEvent?.raw;
   const scheduleDetail = detail?.schedule ?? {};
+  const leaveTypeValue = detail?.leaveType ?? detail?.type ?? "";
+  const isHoliday = detail?.isHoliday;
+  const isOvertime =
+    detail?.isOvertime ||
+    leaveTypeValue === "연장근로" ||
+    leaveTypeValue === "연장 근로";
+  const currentUserKey = normalizeName(currentUser?.name);
+  const scheduleOwnerName =
+    detail?.scheduleSource?.employee?.name ??
+    detail?.scheduleSource?.writer?.name ??
+    detail?.scheduleSource?.createdBy?.name ??
+    detail?.scheduleSource?.createdByName ??
+    "";
+  const isMyEvent =
+    Boolean(selectedEvent?.isMine) ||
+    (currentUserKey &&
+      normalizeName(detail?.employee?.name) === currentUserKey) ||
+    (currentUserKey &&
+      normalizeName(scheduleOwnerName) === currentUserKey);
+  const hasAuthority = (target) =>
+    authorities.some((auth) => auth === target || auth === `role_${target}`);
+  const canEditAnySchedule =
+    hasAuthority("schedule_admin") || hasAuthority("schdule_admin");
   const scheduleHullInfo =
     [scheduleDetail?.hullNo, scheduleDetail?.imoNumber]
       .filter(Boolean)
       .join(" / ") || "-";
   const isSchedule = detail?.isSchedule;
+  const leaveStatus =
+    detail?.approvalStatus ?? detail?.approvalStatusDisplay ?? "";
+  const overtimeStatus = detail?.status ?? detail?.approvalStatus ?? "";
+  const canEditSchedule =
+    Boolean(detail?.scheduleSource?.id) && (isMyEvent || canEditAnySchedule);
+  const canEditLeave =
+    !isSchedule &&
+    !isOvertime &&
+    !isHoliday &&
+    Boolean(detail?.id) &&
+    isMyEvent &&
+    leaveStatus !== "취소" &&
+    leaveTypeValue !== "경조사";
+  const canEditOvertime =
+    isOvertime && Boolean(detail?.id) && isMyEvent && overtimeStatus !== "취소";
+  const canEditDetail = canEditSchedule || canEditLeave || canEditOvertime;
   const employeeName = detail?.employee?.name ?? "-";
   const displayName = detail?.isHoliday
     ? detail?.dateName ?? detail?.name ?? "공휴일"
@@ -553,7 +636,7 @@ export default function Schedule() {
   const showTime =
     leaveType === "오전반차" ||
     leaveType === "오후반차" ||
-    detail?.isOvertime;
+    isOvertime;
   const popoverMaxHeight = isSchedule
     ? isMobile
       ? 520
@@ -596,7 +679,7 @@ export default function Schedule() {
 
   const [onlyMine, setOnlyMine] = useState(false);
   const [deptOpen, setDeptOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState({ name: "", department: "" });
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const [dragStartX, setDragStartX] = useState(null);
   const [approvedLeaves, setApprovedLeaves] = useState([]);
@@ -726,6 +809,55 @@ export default function Schedule() {
     };
 
     fetchCurrentUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchAuthorities = async () => {
+      try {
+        const res = await api.get("/employees/me");
+        const data = res?.data ?? {};
+        if (!mounted) return;
+
+        const rawAuthorities =
+          data?.roles ??
+          data?.role ??
+          data?.schedulePermissions ??
+          data?.schedulePermission ??
+          data?.scheduleRole ??
+          [];
+        const normalized = Array.isArray(rawAuthorities)
+          ? rawAuthorities
+              .flatMap((item) => {
+                if (!item) return [];
+                if (typeof item === "string") return [item];
+                return [item.authorityName, item.name, item.authority].filter(
+                  Boolean,
+                );
+              })
+              .map((v) => String(v).toLowerCase())
+          : [rawAuthorities].flatMap((v) => {
+              if (!v) return [];
+              return String(v)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((s) => s.toLowerCase());
+            });
+
+        setAuthorities(normalized);
+      } catch (e) {
+        if (!mounted) return;
+        setAuthorities([]);
+      }
+    };
+
+    fetchAuthorities();
 
     return () => {
       mounted = false;
@@ -945,26 +1077,16 @@ export default function Schedule() {
     setShowSchedule(next);
   };
 
-  const FilterCheckbox = ({ label, checked, onPress }) => (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={[
-        styles.filterChip,
-        isMobile && styles.filterChipMobile,
-      ]}
-    >
-      <Checkbox value={checked} onValueChange={onPress} color="#121D6D" />
-      <Text
-        style={[
-          styles.filterLabel,
-          isMobile && styles.filterLabelMobile,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  const getFilterLabel = () => {
+    if (allChecked) return "전체";
+    const active = [
+      showLeave ? "휴가" : null,
+      showOvertime ? "연장 근로" : null,
+      showSchedule ? "작업 일정" : null,
+    ].filter(Boolean);
+    if (active.length === 0) return "없음";
+    return active.join(", ");
+  };
 
   return (
     <View style={[styles.page, isMobile && styles.pageMobile]}>
@@ -1115,6 +1237,111 @@ export default function Schedule() {
               )}
             </View>
 
+            <View style={styles.filterWrap}>
+              <TouchableOpacity
+                onPress={() => setFilterOpen(!filterOpen)}
+                style={[
+                  styles.filterButton,
+                  isMobile && styles.filterButtonMobile,
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.filterButtonText,
+                    isNarrow && styles.filterButtonTextSmall,
+                  ]}
+                >
+                  구분: {getFilterLabel()}
+                </Text>
+                <Text style={styles.filterButtonText}>
+                  {filterOpen ? "▲" : "▼"}
+                </Text>
+              </TouchableOpacity>
+
+              {filterOpen && (
+                <View
+                  style={[
+                    styles.filterDropdown,
+                    isMobile && styles.filterDropdownMobile,
+                  ]}
+                >
+                  <TouchableOpacity
+                    onPress={toggleAll}
+                    style={styles.filterItem}
+                  >
+                    <Checkbox
+                      value={allChecked}
+                      onValueChange={toggleAll}
+                      color="#121D6D"
+                    />
+                    <Text
+                      style={[
+                        styles.filterItemText,
+                        allChecked && styles.filterItemTextActive,
+                      ]}
+                    >
+                      전체
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowLeave((v) => !v)}
+                    style={styles.filterItem}
+                  >
+                    <Checkbox
+                      value={showLeave}
+                      onValueChange={() => setShowLeave((v) => !v)}
+                      color="#121D6D"
+                    />
+                    <Text
+                      style={[
+                        styles.filterItemText,
+                        showLeave && styles.filterItemTextActive,
+                      ]}
+                    >
+                      휴가
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowOvertime((v) => !v)}
+                    style={styles.filterItem}
+                  >
+                    <Checkbox
+                      value={showOvertime}
+                      onValueChange={() => setShowOvertime((v) => !v)}
+                      color="#121D6D"
+                    />
+                    <Text
+                      style={[
+                        styles.filterItemText,
+                        showOvertime && styles.filterItemTextActive,
+                      ]}
+                    >
+                      연장 근로
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowSchedule((v) => !v)}
+                    style={styles.filterItem}
+                  >
+                    <Checkbox
+                      value={showSchedule}
+                      onValueChange={() => setShowSchedule((v) => !v)}
+                      color="#121D6D"
+                    />
+                    <Text
+                      style={[
+                        styles.filterItemText,
+                        showSchedule && styles.filterItemTextActive,
+                      ]}
+                    >
+                      작업 일정
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
             {!isMobile ? (
               <TouchableOpacity
                 onPress={() => setOnlyMine((v) => !v)}
@@ -1126,34 +1353,6 @@ export default function Schedule() {
                 </Text>
               </TouchableOpacity>
             ) : null}
-
-            <View
-              style={[
-                styles.filterRow,
-                isMobile && styles.filterRowMobile,
-              ]}
-            >
-              <FilterCheckbox
-                label="전체"
-                checked={allChecked}
-                onPress={toggleAll}
-              />
-              <FilterCheckbox
-                label="휴가"
-                checked={showLeave}
-                onPress={() => setShowLeave((v) => !v)}
-              />
-              <FilterCheckbox
-                label="연장 근로"
-                checked={showOvertime}
-                onPress={() => setShowOvertime((v) => !v)}
-              />
-              <FilterCheckbox
-                label="작업 일정"
-                checked={showSchedule}
-                onPress={() => setShowSchedule((v) => !v)}
-              />
-            </View>
           </View>
         </View>
       </View>
@@ -1321,9 +1520,16 @@ export default function Schedule() {
                   일정 상세
                 </Text>
               </View>
-              <TouchableOpacity onPress={closeEventModal}>
-                <Text style={{ fontSize: 14, color: "#64748B" }}>닫기</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                {canEditDetail ? (
+                  <TouchableOpacity onPress={handleEditDetail}>
+                    <Text style={{ fontSize: 14, color: "#2563EB" }}>수정</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={closeEventModal}>
+                  <Text style={{ fontSize: 14, color: "#64748B" }}>닫기</Text>
+                </TouchableOpacity>
+              </View>
             </View>
               );
             })()}
@@ -1826,18 +2032,42 @@ export default function Schedule() {
                 </>
               )}
 
-              <TouchableOpacity
-                onPress={closeEventModal}
+              <View
                 style={{
-                  alignSelf: "flex-end",
-                  paddingVertical: 10,
-                  paddingHorizontal: 18,
-                  borderRadius: 999,
-                  backgroundColor: "#121D6D",
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  gap: 8,
                 }}
               >
-                <Text style={{ color: "white", fontWeight: "bold" }}>닫기</Text>
-              </TouchableOpacity>
+                {canEditDetail ? (
+                  <TouchableOpacity
+                    onPress={handleEditDetail}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 18,
+                      borderRadius: 999,
+                      backgroundColor: "#E0E7FF",
+                    }}
+                  >
+                    <Text style={{ color: "#1D4ED8", fontWeight: "bold" }}>
+                      수정
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  onPress={closeEventModal}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 18,
+                    borderRadius: 999,
+                    backgroundColor: "#121D6D",
+                  }}
+                >
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    닫기
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
@@ -2170,35 +2400,58 @@ const styles = StyleSheet.create({
   mineButtonTextSmall: {
     fontSize: 12,
   },
-  filterRow: {
+  filterWrap: {
+    position: "relative",
+    zIndex: 20,
+    elevation: 20,
+  },
+  filterButton: {
+    width: 200,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
     flexDirection: "row",
-    gap: 10,
-    padding: 6,
-    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "white",
+    zIndex: 30,
+    elevation: 30,
   },
-  filterRowMobile: {
-    flexWrap: "wrap",
+  filterButtonMobile: {
+    width: "100%",
   },
-  filterChip: {
+  filterButtonText: {
+    fontSize: 13,
+    color: "#0F172A",
+  },
+  filterButtonTextSmall: {
+    fontSize: 12,
+  },
+  filterDropdown: {
+    position: "absolute",
+    top: 40,
+    left: 0,
+    width: 200,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "white",
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  filterDropdownMobile: {
+    width: "100%",
+  },
+  filterItem: {
+    padding: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    backgroundColor: "white",
   },
-  filterChipMobile: {
-    paddingVertical: 7,
+  filterItemText: {
+    color: "#6B7280",
   },
-  filterLabel: {
-    fontSize: 12,
-    color: "#0F172A",
-    fontWeight: "600",
-  },
-  filterLabelMobile: {
-    fontSize: 11,
+  filterItemTextActive: {
+    color: "#2563EB",
   },
 });

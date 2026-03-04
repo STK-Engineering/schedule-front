@@ -11,7 +11,7 @@ import {
   Alert,
   useWindowDimensions,
 } from "react-native";
-import Checkbox from "expo-checkbox";
+import Checkbox from "expo-checkbox"; 
 import api from "../../api/api";
 import PageLayout from "../../components/PageLayout";
 
@@ -40,31 +40,27 @@ const ROLE_MAP = {
   ADMIN: "관리자",
   MANAGER: "결재자",
 };
-const ROLE_TO_API_MAP = {
-  일반: "GENERAL",
-  관리자: "ADMIN",
-  결재자: "MANAGER",
-};
+const ROLE_TO_API_MAP = Object.fromEntries(
+  Object.entries(ROLE_MAP).map(([key, value]) => [value, key]),
+);
 const SCHEDULE_ROLE_MAP = {
   SCHEDULE_GENERAL: "일반",
-  "SCHEDULE-GENERAL": "일반",
   SCHEDULE_ADMIN: "관리자",
-  "SCHEDULE-ADMIN": "관리자",
 };
-const SCHEDULE_ROLE_DISPLAY_MAP = {
-  SCHEDULE_GENERAL: "일정-일반",
-  "SCHEDULE-GENERAL": "일정-일반",
-  SCHEDULE_ADMIN: "일정-관리자",
-  "SCHEDULE-ADMIN": "일정-관리자",
-};
-const SCHEDULE_ROLE_DISPLAY_TO_API_MAP = {
-  "일정-일반": "SCHEDULE-GENERAL",
-  "일정-관리자": "SCHEDULE-ADMIN",
-};
-const SCHEDULE_ROLE_TO_API_MAP = {
-  일반: "SCHEDULE-GENERAL",
-  관리자: "SCHEDULE-ADMIN",
-};
+const SCHEDULE_ROLE_DISPLAY_MAP = Object.fromEntries(
+  Object.entries(SCHEDULE_ROLE_MAP).map(([key, value]) => [
+    key,
+    `일정-${value}`,
+  ]),
+);
+const SCHEDULE_ROLE_DISPLAY_TO_API_MAP = Object.fromEntries(
+  Object.entries(SCHEDULE_ROLE_DISPLAY_MAP).map(([key, value]) => [value, key]),
+);
+const SCHEDULE_ROLE_TO_API_MAP = Object.fromEntries(
+  Object.entries(SCHEDULE_ROLE_MAP).map(([key, value]) => [value, key]),
+);
+const SCHEDULE_ROLE_KEY_SET = new Set(Object.keys(SCHEDULE_ROLE_MAP));
+const SCHEDULE_ROLE_DISPLAY_SET = new Set(Object.values(SCHEDULE_ROLE_DISPLAY_MAP));
 const ENGINEERING_DEPT_ID = 3;
 const ENGINEERING_SUB_DEPTS = [
   { label: "AMS", value: 1 },
@@ -175,8 +171,16 @@ function normalizeRoles(value) {
       .map((v) => String(v).trim())
       .map((v) => {
         const key = String(v).toUpperCase();
-        return SCHEDULE_ROLE_DISPLAY_MAP[key] ?? ROLE_MAP[key] ?? v;
-      });
+        if (
+          SCHEDULE_ROLE_KEY_SET.has(key) ||
+          SCHEDULE_ROLE_DISPLAY_SET.has(v) ||
+          v.startsWith("일정-")
+        ) {
+          return null;
+        }
+        return ROLE_MAP[key] ?? v;
+      })
+      .filter(Boolean);
     return Array.from(new Set([BASE_ROLE, ...cleaned]));
   }
   if (typeof value === "string") {
@@ -186,8 +190,16 @@ function normalizeRoles(value) {
       .filter(Boolean)
       .map((v) => {
         const key = String(v).toUpperCase();
-        return SCHEDULE_ROLE_DISPLAY_MAP[key] ?? ROLE_MAP[key] ?? v;
-      });
+        if (
+          SCHEDULE_ROLE_KEY_SET.has(key) ||
+          SCHEDULE_ROLE_DISPLAY_SET.has(v) ||
+          v.startsWith("일정-")
+        ) {
+          return null;
+        }
+        return ROLE_MAP[key] ?? v;
+      })
+      .filter(Boolean);
     return Array.from(new Set([BASE_ROLE, ...parts]));
   }
   return [BASE_ROLE];
@@ -209,7 +221,20 @@ function normalizeSchedulePermissions(value) {
       return [v.name, v.role, v.authorityName].filter(Boolean);
     })
     .map((v) => String(v).trim())
-    .map((v) => SCHEDULE_ROLE_MAP[v.toUpperCase()] ?? (v === "일반" || v === "관리자" ? v : null))
+    .map((v) => {
+      const upper = v.toUpperCase();
+      if (SCHEDULE_ROLE_MAP[upper]) return SCHEDULE_ROLE_MAP[upper];
+      if (SCHEDULE_ROLE_DISPLAY_TO_API_MAP[v]) {
+        return (
+          SCHEDULE_ROLE_MAP[SCHEDULE_ROLE_DISPLAY_TO_API_MAP[v]] ?? null
+        );
+      }
+      if (v.startsWith("일정-")) {
+        const stripped = v.replace("일정-", "");
+        return stripped === "일반" || stripped === "관리자" ? stripped : null;
+      }
+      return v === "일반" || v === "관리자" ? v : null;
+    })
     .filter(Boolean);
 
   return Array.from(new Set(mapped));
@@ -399,8 +424,6 @@ export default function Setting() {
       .map(
         (v) =>
           ROLE_TO_API_MAP[v] ??
-          SCHEDULE_ROLE_DISPLAY_TO_API_MAP[v] ??
-          SCHEDULE_ROLE_TO_API_MAP[v] ??
           String(v).trim().toUpperCase(),
       )
       .filter(Boolean);

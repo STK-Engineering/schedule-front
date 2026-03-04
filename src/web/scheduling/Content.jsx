@@ -1,13 +1,97 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import PageLayout from "../../components/PageLayout";
+import api from "../../api/api";
 
 export default function SchedulingContent({ route }) {
   const navigation = useNavigation();
   const params = route?.params ?? {};
   const source = params?.source ?? null;
-  const canEdit = Boolean(source?.id);
+  const [authorities, setAuthorities] = useState([]);
+  const [currentUserName, setCurrentUserName] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchMe = async () => {
+      try {
+        const res = await api.get("/employees/me");
+        const data = res?.data ?? {};
+        if (!mounted) return;
+
+        setCurrentUserName(
+          String(data?.name ?? data?.employee?.name ?? "").trim(),
+        );
+
+        const rawAuthorities = data?.roles ?? data?.role ?? [];
+        const normalized = Array.isArray(rawAuthorities)
+          ? rawAuthorities
+              .flatMap((item) => {
+                if (!item) return [];
+                if (typeof item === "string") return [item];
+                return [item.authorityName, item.name, item.authority].filter(
+                  Boolean,
+                );
+              })
+              .map((v) => String(v).toLowerCase())
+          : [rawAuthorities].flatMap((v) => {
+              if (!v) return [];
+              return String(v)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((s) => s.toLowerCase());
+            });
+
+        setAuthorities(normalized);
+      } catch (e) {
+        if (!mounted) return;
+        setCurrentUserName("");
+        setAuthorities([]);
+      }
+    };
+
+    fetchMe();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const normalizeAuthority = (value) =>
+    String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/^role_/, "");
+
+  const hasAuthority = (target) =>
+    authorities.some(
+      (auth) => normalizeAuthority(auth) === normalizeAuthority(target),
+    );
+
+  const isScheduleAdmin =
+    hasAuthority("schedule_admin") || hasAuthority("schdule_admin");
+  const isScheduleGeneral =
+    hasAuthority("schedule_general") || hasAuthority("schdule_general");
+
+  const scheduleOwnerName =
+    source?.employee?.name ??
+    source?.writer?.name ??
+    source?.createdBy?.name ??
+    source?.createdByName ??
+    "";
+
+  const isOwner = useMemo(() => {
+    if (!currentUserName || !scheduleOwnerName) return false;
+    return (
+      String(scheduleOwnerName).trim().toLowerCase() ===
+      String(currentUserName).trim().toLowerCase()
+    );
+  }, [currentUserName, scheduleOwnerName]);
+
+  const canEdit =
+    Boolean(source?.id) && (isScheduleAdmin || (isScheduleGeneral && isOwner));
 
   const {
     jobNumber = "",

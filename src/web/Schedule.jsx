@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { useRoute } from "@react-navigation/native";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Platform,
   Modal,
   ScrollView,
+  StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import Checkbox from "expo-checkbox";
 import { Calendar, DefaultCalendarEventRenderer } from "react-native-big-calendar";
@@ -26,13 +28,30 @@ function leaveTypeToTimeRange(leaveType) {
   }
 }
 
+function normalizeName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function approvalSuffix(item) {
+  const status = item?.approvalStatusDisplay ?? item?.approvalStatus ?? "";
+  const text = String(status);
+  if (text.includes("대기")) return "(결재 대기)";
+  return "";
+}
+
 function toDate(dateStr, h, m) {
-  const [y, mo, d] = dateStr.split("-").map(Number);
+  const dateKey = normalizeHolidayDate(dateStr);
+  if (!dateKey) return null;
+  const [y, mo, d] = dateKey.split("-").map(Number);
   return new Date(y, mo - 1, d, h, m, 0);
 }
 
 function toDateOnly(dateStr) {
-  const [y, mo, d] = dateStr.split("-").map(Number);
+  const dateKey = normalizeHolidayDate(dateStr);
+  if (!dateKey) return null;
+  const [y, mo, d] = dateKey.split("-").map(Number);
   return new Date(y, mo - 1, d, 0, 0, 0);
 }
 
@@ -48,9 +67,10 @@ function leaveToEvents(item, holidayDateSet) {
 
   const { startH, startM, endH, endM } = leaveTypeToTimeRange(leaveType);
 
-  const title = `${empName}${deptName ? ` (${deptName})` : ""} - ${leaveType}`;
-  const startDate = item?.startDate;
-  const endDate = item?.endDate || startDate;
+  const approvalTag = approvalSuffix(item);
+  const title = `${approvalTag ? `${approvalTag} ` : ""}${empName} - ${leaveType}`;
+  const startDate = normalizeHolidayDate(item?.startDate);
+  const endDate = normalizeHolidayDate(item?.endDate) || startDate;
   if (!startDate || !endDate) return [];
 
   const isAnnualLeave = leaveType === "연차";
@@ -58,36 +78,57 @@ function leaveToEvents(item, holidayDateSet) {
   if (!isAnnualLeave) {
     const start = toDate(startDate, startH, startM);
     const end = toDate(endDate, endH, endM);
+    if (!start || !end) return [];
     return [{ title, start, end, isMine: item?.isMine ?? false, raw: item }];
   }
 
-  const events = [];
+  const includedDates = [];
   let cursor = toDateOnly(startDate);
   const last = toDateOnly(endDate);
+  if (!cursor || !last) return [];
 
   while (cursor <= last) {
     if (!isWeekend(cursor)) {
-      const dateKey = `${cursor.getFullYear()}-${String(
-        cursor.getMonth() + 1,
-      ).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
-      if (holidayDateSet?.has(dateKey)) {
-        cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
-        continue;
+      const dateKey = toDateKey(cursor);
+      if (!holidayDateSet?.has(dateKey)) {
+        includedDates.push(dateKey);
       }
-      const start = toDate(dateKey, startH, startM);
-      const end = toDate(dateKey, endH, endM);
-      events.push({
+    }
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+  }
+
+  if (!includedDates.length) return [];
+
+  const ranges = [];
+  let rangeStart = includedDates[0];
+  let rangeEnd = includedDates[0];
+
+  for (let i = 1; i < includedDates.length; i += 1) {
+    const current = includedDates[i];
+    if (isNextDateKey(rangeEnd, current)) {
+      rangeEnd = current;
+    } else {
+      ranges.push([rangeStart, rangeEnd]);
+      rangeStart = current;
+      rangeEnd = current;
+    }
+  }
+  ranges.push([rangeStart, rangeEnd]);
+
+  return ranges
+    .map(([rangeStartKey, rangeEndKey]) => {
+      const start = toDate(rangeStartKey, startH, startM);
+      const end = toDate(rangeEndKey, endH, endM);
+      if (!start || !end) return null;
+      return {
         title,
         start,
         end,
         isMine: item?.isMine ?? false,
         raw: item,
-      });
-    }
-    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
-  }
-
-  return events;
+      };
+    })
+    .filter(Boolean);
 }
 
 function parseTimeToParts(time) {
@@ -110,7 +151,8 @@ function overtimeToEvent(item) {
   const start = toDate(requestDate, startParts.h, startParts.m);
   const end = toDate(requestDate, endParts.h, endParts.m);
 
-  const title = `${empName}${deptName ? ` (${deptName})` : ""} - 연장근로`;
+  const approvalTag = approvalSuffix(item);
+  const title = `${approvalTag ? `${approvalTag} ` : ""}${empName} - 연장근로`;
 
   return {
     title,
@@ -124,6 +166,84 @@ function overtimeToEvent(item) {
       isOvertime: true,
     },
   };
+}
+
+function scheduleToEvents(item, currentUserKey) {
+  const schedules = Array.isArray(item?.jobScheduleList)
+    ? item.jobScheduleList
+    : [];
+  if (schedules.length === 0) return [];
+
+  const vesselName = item?.vesselName ?? "";
+  const region = item?.region ?? "";
+  const workType = item?.description ?? item?.workType ?? "";
+  const systemType = item?.systemType ?? item?.sysName ?? "";
+
+  return schedules.flatMap((schedule, index) => {
+    const startKey = normalizeHolidayDate(schedule?.startDate);
+    const endKey = normalizeHolidayDate(schedule?.endDate) || startKey;
+    if (!startKey || !endKey) return [];
+
+    const start = toDate(startKey, 0, 0);
+    const end = toDate(endKey, 23, 59);
+    if (!start || !end) return [];
+
+    const engineerList = Array.isArray(schedule?.jobScheduleEngineerList)
+      ? schedule.jobScheduleEngineerList
+      : [];
+    const engineers =
+      engineerList.length > 0 ? engineerList : [{ engineerName: "-" }];
+
+    return engineers.map((engineer, engineerIndex) => {
+      const engineerName =
+        engineer?.engineerName ??
+        engineer?.externalName ??
+        engineer?.name ??
+        "-";
+      const departmentName =
+        engineer?.department?.name ??
+        engineer?.department ??
+        engineer?.departmentName ??
+        engineer?.engineerDepartment ??
+        engineer?.engineerDepartmentName ??
+        (engineer?.engineerType === "INTERNAL" ? "ENGINEERING" : "");
+      const isMine =
+        currentUserKey && normalizeName(engineerName) === currentUserKey;
+      const title = `${engineerName || "-"}-${vesselName || "-"}-${region || "-"}`;
+      return {
+        title,
+        start,
+        end,
+        isMine,
+        raw: {
+          isSchedule: true,
+          leaveType: "작업 일정",
+          reason: schedule?.note ?? item?.jobDescription ?? "",
+          employee: {
+            name: engineerName || "엔지니어",
+            department: { name: departmentName ?? "" },
+          },
+          scheduleSource: item,
+          schedule: {
+            id:
+              schedule?.id ??
+              `${item?.id ?? "item"}-${index}-${engineerIndex}`,
+            jobNumber: item?.jobNumber ?? "",
+            workType,
+            systemType,
+            region: item?.region ?? "",
+            vesselName: item?.vesselName ?? "",
+            hullNo: item?.hullNo ?? "",
+            imoNumber: item?.imoNumber ?? "",
+            customer: item?.customer ?? "",
+            jobDescription: item?.jobDescription ?? "",
+            engineerName: engineerName || "",
+            note: schedule?.note ?? "",
+          },
+        },
+      };
+    });
+  });
 }
 
 function normalizeHolidayDate(value) {
@@ -177,39 +297,113 @@ function isDateInRange(dateKey, start, end) {
   return dateKey >= startKey && dateKey <= endKey;
 }
 
-const LEAVE_TYPE_STYLES = {
-  연차: { bg: "#DCEFE6", border: "#9CCFB6", text: "#1F5A45" },
-  오전반차: { bg: "#DDE9FB", border: "#9BBEE6", text: "#1D4C7A" },
-  오후반차: { bg: "#E5E3FB", border: "#B7B7E6", text: "#3B3E7E" },
-  "본인의 결혼": { bg: "#EEE7E1", border: "#D2C7BC", text: "#5B4E44" },
-  "배우자 출산": { bg: "#EEE7E1", border: "#D2C7BC", text: "#5B4E44" },
-  "본인•배우자의 부모 또는 배우자의 사망": {
-    bg: "#EEE7E1",
-    border: "#D2C7BC",
-    text: "#5B4E44",
-  },
-  "본인•배우자의 조부모 또는 외조부모의 사망": {
-    bg: "#EEE7E1",
-    border: "#D2C7BC",
-    text: "#5B4E44",
-  },
-  "자녀 또는 자녀의 배우자 사망": { bg: "#F4E2E2", border: "#E0B1B1", text: "#7A2D2D" },
-  "본인•배우자의 형제•자매 사망": { bg: "#F4E2E2", border: "#E0B1B1", text: "#7A2D2D" },
-  건강검진: { bg: "#EAEFF6", border: "#C1CAD7", text: "#3A4A5E" },
-  예비군: { bg: "#EAEFF6", border: "#C1CAD7", text: "#3A4A5E" },
-  특별보상휴가: { bg: "#EAEFF6", border: "#C1CAD7", text: "#3A4A5E" },
-  무급: { bg: "#EAEFF6", border: "#C1CAD7", text: "#3A4A5E" },
-  출산: { bg: "#F7E0EC", border: "#E2B4CB", text: "#7A3B58" },
-  연장근로: { bg: "#D8F1EF", border: "#9DCFCB", text: "#0F5D58" },
-  공휴일: { bg: "#F4F7FB", border: "#E8B8B8", text: "#B42323" },
+function isNextDateKey(prevDateKey, nextDateKey) {
+  const prev = toDateOnly(prevDateKey);
+  const nextOfPrev = new Date(prev);
+  nextOfPrev.setDate(prev.getDate() + 1);
+  return toDateKey(nextOfPrev) === nextDateKey;
+}
+
+function buildHolidayEvent(name, startDateKey, endDateKey, dates) {
+  return {
+    title: name || "공휴일",
+    start: toDate(startDateKey, 0, 0),
+    end: toDate(endDateKey, 23, 59),
+    raw: {
+      leaveType: "공휴일",
+      isHoliday: true,
+      name: name || "공휴일",
+      dateName: name || "공휴일",
+      startDate: startDateKey,
+      endDate: endDateKey,
+      dates,
+    },
+  };
+}
+
+function mergeConsecutiveHolidayEvents(holidayItems) {
+  const byName = new Map();
+  const dedupe = new Set();
+
+  for (const holiday of holidayItems) {
+    const date = normalizeHolidayDate(holiday?.date);
+    if (!date) continue;
+    const name = String(holiday?.name || "공휴일");
+    const key = `${name}|${date}`;
+    if (dedupe.has(key)) continue;
+    dedupe.add(key);
+
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(date);
+  }
+
+  const merged = [];
+  for (const [name, dates] of byName.entries()) {
+    const sortedDates = Array.from(new Set(dates)).sort();
+    if (!sortedDates.length) continue;
+
+    let rangeStart = sortedDates[0];
+    let rangeEnd = sortedDates[0];
+    let rangeDates = [sortedDates[0]];
+
+    for (let i = 1; i < sortedDates.length; i += 1) {
+      const current = sortedDates[i];
+      if (isNextDateKey(rangeEnd, current)) {
+        rangeEnd = current;
+        rangeDates.push(current);
+      } else {
+        merged.push(buildHolidayEvent(name, rangeStart, rangeEnd, rangeDates));
+        rangeStart = current;
+        rangeEnd = current;
+        rangeDates = [current];
+      }
+    }
+
+    merged.push(buildHolidayEvent(name, rangeStart, rangeEnd, rangeDates));
+  }
+
+  return merged.sort((a, b) => a.start - b.start);
+}
+
+const LEAVE_UNIFIED_STYLE = {
+  bg: "#FCE7F3",
+  border: "#F9A8D4",
+  text: "#9D174D",
 };
 
-const getLeaveTypeStyle = (leaveType) =>
-  LEAVE_TYPE_STYLES[leaveType] ?? {
-    bg: "#E5E7EB",
-    border: "#9CA3AF",
-    text: "#334155",
-  };
+const LEAVE_TYPES_UNIFIED = new Set([
+  "연차",
+  "오전반차",
+  "오후반차",
+  "본인의 결혼",
+  "배우자 출산",
+  "본인•배우자의 부모 또는 배우자의 사망",
+  "본인•배우자의 조부모 또는 외조부모의 사망",
+  "자녀 또는 자녀의 배우자 사망",
+  "본인•배우자의 형제•자매 사망",
+  "건강검진",
+  "예비군",
+  "특별보상휴가",
+  "무급",
+  "출산",
+]);
+
+const LEAVE_TYPE_STYLES = {
+  연장근로: { bg: "#E0F2FE", border: "#93C5FD", text: "#1D4ED8" },
+  공휴일: { bg: "#F4F7FB", border: "#E8B8B8", text: "#B42323" },
+  "작업 일정": { bg: "#FEF9C3", border: "#FACC15", text: "#A16207" },
+};
+
+const getLeaveTypeStyle = (leaveType) => {
+  if (LEAVE_TYPES_UNIFIED.has(leaveType)) return LEAVE_UNIFIED_STYLE;
+  return (
+    LEAVE_TYPE_STYLES[leaveType] ?? {
+      bg: "#E5E7EB",
+      border: "#9CA3AF",
+      text: "#334155",
+    }
+  );
+};
 
 const addDays = (date, days) => {
   const d = new Date(date);
@@ -239,28 +433,86 @@ const moveByMode = (date, mode, step) => {
 };
 
 export default function Schedule() {
+  const navigation = useNavigation();
   const route = useRoute();
+  const { width, height } = useWindowDimensions();
+  const isMobile = width < 800;
+  const isNarrow = width < 520;
 
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [eventPopoverPos, setEventPopoverPos] = useState({ x: 0, y: 0 });
+  const [containerRect, setContainerRect] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+  });
+  const lastPointerRef = useRef(null);
   const [dayEventsModalOpen, setDayEventsModalOpen] = useState(false);
   const [dayEvents, setDayEvents] = useState([]);
   const [dayEventsDate, setDayEventsDate] = useState(null);
+  const calendarWrapRef = useRef(null);
 
   const [mode, setMode] = useState("month");
   const [currentDate, setCurrentDate] = useState(() =>
     normalizeForMode(new Date(), "month")
   );
 
+  const [currentUser, setCurrentUser] = useState({ name: "", department: "" });
+  const [authorities, setAuthorities] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [selectedDept, setSelectedDept] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showLeave, setShowLeave] = useState(true);
   const [showOvertime, setShowOvertime] = useState(true);
+  const [showSchedule, setShowSchedule] = useState(true);
 
-  const openEventModal = (event) => {
+  const popoverWidth = Math.min(360, Math.max(280, width - 24));
+  const calendarHeight = Math.max(
+    480,
+    Math.min(760, height - (isMobile ? 260 : 220))
+  );
+
+  const openEventModal = (event, pressEvent) => {
+    const isScheduleEvent = event?.raw?.isSchedule;
     setSelectedEvent(event);
     setEventModalOpen(true);
+    const popWidth = popoverWidth;
+    const popHeight = isScheduleEvent ? (isMobile ? 520 : 420) : isMobile ? 420 : 360;
+    const maxX = Math.max(
+      8,
+      (containerRect.width || popWidth + 16) - popWidth - 8
+    );
+    const maxY = Math.max(
+      8,
+      (containerRect.height || popHeight + 16) - popHeight - 8
+    );
+    const pointer =
+      pressEvent?.nativeEvent?.pageX != null
+        ? {
+            x: pressEvent.nativeEvent.pageX,
+            y: pressEvent.nativeEvent.pageY,
+          }
+        : lastPointerRef.current;
+
+    if (pointer?.x != null && pointer?.y != null) {
+      const rawX = pointer.x - (containerRect.x || 0);
+      const rawY = pointer.y - (containerRect.y || 0);
+      const x = Math.min(Math.max(8, rawX + 12), maxX);
+      const y = Math.min(Math.max(8, rawY + 12), maxY);
+      setEventPopoverPos({ x, y });
+      return;
+    }
+    const fallbackX =
+      containerRect.width > 0
+        ? Math.min(Math.max(8, (containerRect.width - popWidth) / 2), maxX)
+        : 16;
+    const fallbackY =
+      containerRect.height > 0
+        ? Math.min(Math.max(8, (containerRect.height - popHeight) / 2), maxY)
+        : 16;
+    setEventPopoverPos({ x: fallbackX, y: fallbackY });
   };
 
   const openDayEventsModal = (date, list) => {
@@ -274,6 +526,46 @@ export default function Schedule() {
     setSelectedEvent(null);
   };
 
+  const handleEditDetail = () => {
+    if (!detail) return;
+    if (canEditSchedule) {
+      const source = detail?.scheduleSource ?? null;
+      closeEventModal();
+      navigation.navigate("SchedulingForm", {
+        mode: "edit",
+        source,
+      });
+      return;
+    }
+    if (canEditOvertime) {
+      closeEventModal();
+      navigation.navigate("OverTimeEdit", {
+        id: detail.id,
+        jobNumber: detail.jobNumber,
+        vesselName: detail.vesselName,
+        hullNo: detail.hullNo,
+        jobDescription: detail.jobDescription,
+        requestDate: detail.requestDate,
+        startTime: detail.startTime,
+        endTime: detail.endTime,
+        imageUrl: detail.imageUrl,
+      });
+      return;
+    }
+    if (canEditLeave) {
+      closeEventModal();
+      navigation.navigate("LeaveEdit", {
+        id: detail.id,
+        leaveType: detail.type ?? detail.leaveType,
+        startDate: detail.startDate,
+        endDate: detail.endDate,
+        reason: detail.reason,
+        etc: detail.etc,
+        status: detail.approvalStatusDisplay ?? detail.approvalStatus,
+      });
+    }
+  };
+
   const closeDayEventsModal = () => {
     setDayEventsModalOpen(false);
     setDayEvents([]);
@@ -285,11 +577,56 @@ export default function Schedule() {
     "Sales&Marketing",
     "ENGINEERING",
     "Coordinator",
-    "Logistic&Warehouse",
+    "Logistic&warehouse",
     "IT/ISO",
   ];
 
   const detail = selectedEvent?.raw;
+  const scheduleDetail = detail?.schedule ?? {};
+  const leaveTypeValue = detail?.leaveType ?? detail?.type ?? "";
+  const isHoliday = detail?.isHoliday;
+  const isOvertime =
+    detail?.isOvertime ||
+    leaveTypeValue === "연장근로" ||
+    leaveTypeValue === "연장 근로";
+  const currentUserKey = normalizeName(currentUser?.name);
+  const scheduleOwnerName =
+    detail?.scheduleSource?.employee?.name ??
+    detail?.scheduleSource?.writer?.name ??
+    detail?.scheduleSource?.createdBy?.name ??
+    detail?.scheduleSource?.createdByName ??
+    "";
+  const isMyEvent =
+    Boolean(selectedEvent?.isMine) ||
+    (currentUserKey &&
+      normalizeName(detail?.employee?.name) === currentUserKey) ||
+    (currentUserKey &&
+      normalizeName(scheduleOwnerName) === currentUserKey);
+  const hasAuthority = (target) =>
+    authorities.some((auth) => auth === target || auth === `role_${target}`);
+  const canEditAnySchedule =
+    hasAuthority("schedule_admin") || hasAuthority("schdule_admin");
+  const scheduleHullInfo =
+    [scheduleDetail?.hullNo, scheduleDetail?.imoNumber]
+      .filter(Boolean)
+      .join(" / ") || "-";
+  const isSchedule = detail?.isSchedule;
+  const leaveStatus =
+    detail?.approvalStatus ?? detail?.approvalStatusDisplay ?? "";
+  const overtimeStatus = detail?.status ?? detail?.approvalStatus ?? "";
+  const canEditSchedule =
+    Boolean(detail?.scheduleSource?.id) && (isMyEvent || canEditAnySchedule);
+  const canEditLeave =
+    !isSchedule &&
+    !isOvertime &&
+    !isHoliday &&
+    Boolean(detail?.id) &&
+    isMyEvent &&
+    leaveStatus !== "취소" &&
+    leaveTypeValue !== "경조사";
+  const canEditOvertime =
+    isOvertime && Boolean(detail?.id) && isMyEvent && overtimeStatus !== "취소";
+  const canEditDetail = canEditSchedule || canEditLeave || canEditOvertime;
   const employeeName = detail?.employee?.name ?? "-";
   const displayName = detail?.isHoliday
     ? detail?.dateName ?? detail?.name ?? "공휴일"
@@ -299,7 +636,15 @@ export default function Schedule() {
   const showTime =
     leaveType === "오전반차" ||
     leaveType === "오후반차" ||
-    detail?.isOvertime;
+    isOvertime;
+  const popoverMaxHeight = isSchedule
+    ? isMobile
+      ? 520
+      : 420
+    : isMobile
+    ? 420
+    : 360;
+  const popoverPadding = isNarrow ? 16 : 20;
 
   const formatDate = (date) => {
     if (!date) return "-";
@@ -334,10 +679,12 @@ export default function Schedule() {
 
   const [onlyMine, setOnlyMine] = useState(false);
   const [deptOpen, setDeptOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const [dragStartX, setDragStartX] = useState(null);
   const [approvedLeaves, setApprovedLeaves] = useState([]);
   const [approvedOvertime, setApprovedOvertime] = useState([]);
+  const [scheduleItems, setScheduleItems] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [holidayCache, setHolidayCache] = useState({});
 
@@ -366,15 +713,26 @@ export default function Schedule() {
         list = res.data ?? [];
       }
 
-      const approvedOnly = list.filter(
-        (item) => item.approvalStatusDisplay === "승인"
-      );
+      const approvedOnly = list;
 
-      const overtimeRes = await api.get("/overtime");
-      overtimeList = Array.isArray(overtimeRes.data) ? overtimeRes.data : [];
-      const approvedOvertimeOnly = overtimeList.filter(
-        (item) => item.approvalStatusDisplay === "승인"
-      );
+      if (onlyMine) {
+        const overtimeRes = await api.get("/overtime/me");
+
+        if (Array.isArray(overtimeRes.data)) {
+          overtimeList = overtimeRes.data;
+        } else {
+          overtimeList = [
+            ...(overtimeRes.data?.["요청 대기 건"] ?? []),
+            ...(overtimeRes.data?.["요청 처리 건"] ?? []),
+          ];
+        }
+
+        overtimeList = overtimeList.map((x) => ({ ...x, isMine: true }));
+      } else {
+        const overtimeRes = await api.get("/overtime");
+        overtimeList = Array.isArray(overtimeRes.data) ? overtimeRes.data : [];
+      }
+      const approvedOvertimeOnly = overtimeList;
 
       const deptSet = new Set(DEFAULT_DEPARTMENTS);
 
@@ -433,12 +791,105 @@ export default function Schedule() {
   }, [currentDate, holidayCache]);
 
   useEffect(() => {
+    let mounted = true;
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await api.get("/balances");
+        const data = res?.data ?? {};
+        if (!mounted) return;
+        setCurrentUser({
+          name: data.name ?? data.employee?.name ?? "",
+          department:
+            data.department ?? data.employee?.department?.name ?? "",
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setCurrentUser({ name: "", department: "" });
+      }
+    };
+
+    fetchCurrentUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchAuthorities = async () => {
+      try {
+        const res = await api.get("/employees/me");
+        const data = res?.data ?? {};
+        if (!mounted) return;
+
+        const rawAuthorities =
+          data?.roles ??
+          data?.role ??
+          data?.schedulePermissions ??
+          data?.schedulePermission ??
+          data?.scheduleRole ??
+          [];
+        const normalized = Array.isArray(rawAuthorities)
+          ? rawAuthorities
+              .flatMap((item) => {
+                if (!item) return [];
+                if (typeof item === "string") return [item];
+                return [item.authorityName, item.name, item.authority].filter(
+                  Boolean,
+                );
+              })
+              .map((v) => String(v).toLowerCase())
+          : [rawAuthorities].flatMap((v) => {
+              if (!v) return [];
+              return String(v)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .map((s) => s.toLowerCase());
+            });
+
+        setAuthorities(normalized);
+      } catch (e) {
+        if (!mounted) return;
+        setAuthorities([]);
+      }
+    };
+
+    fetchAuthorities();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const fetchSchedules = useCallback(async () => {
+    try {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const res = await api.get("/engineer-schedule", {
+        params: { year, month },
+      });
+      const list = Array.isArray(res.data) ? res.data : [];
+      setScheduleItems(list);
+    } catch (e) {
+      console.error("스케줄링 일정 불러오기 실패", e);
+      setScheduleItems([]);
+    }
+  }, [currentDate]);
+
+  useEffect(() => {
     fetchLeaves();
   }, [fetchLeaves]);
 
   useEffect(() => {
     fetchHolidays();
   }, [fetchHolidays]);
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [fetchSchedules]);
 
   useEffect(() => {
     setCurrentDate((prev) => normalizeForMode(prev, mode));
@@ -449,6 +900,7 @@ export default function Schedule() {
   }, [departments]);
 
   const events = useMemo(() => {
+    const currentUserKey = normalizeName(currentUser?.name);
     const holidayDateSet = new Set(
       holidays
         .map((holiday) => normalizeHolidayDate(holiday?.date))
@@ -476,28 +928,45 @@ export default function Schedule() {
     const overtimeEvents = filteredOvertime
       .map(overtimeToEvent)
       .filter(Boolean);
-    const holidayEvents = holidays
-      .map((holiday) => {
-        const date = normalizeHolidayDate(holiday?.date);
-        if (!date) return null;
-        return {
-          title: holiday?.name ? holiday.name : "공휴일",
-          start: toDate(date, 0, 0),
-          end: toDate(date, 23, 59),
-          raw: { ...holiday, leaveType: "공휴일", isHoliday: true },
-        };
-      })
-      .filter(Boolean);
+    const scheduleEvents = scheduleItems.flatMap((item) =>
+      scheduleToEvents(item, currentUserKey)
+    );
+    const filteredSchedules =
+      selectedDept.length === 0 && !onlyMine
+        ? scheduleEvents
+        : scheduleEvents.filter((event) => {
+            if (selectedDept.length > 0) {
+              const deptName =
+                event?.raw?.employee?.department?.name ?? "";
+              if (!selectedDept.includes(deptName)) return false;
+            }
+            if (onlyMine && !event?.isMine) return false;
+            return true;
+          });
+    const holidayEvents = mergeConsecutiveHolidayEvents(holidays);
 
     const includeLeave = showLeave;
     const includeOvertime = showOvertime;
+    const includeSchedule = showSchedule;
 
     return [
       ...(includeLeave ? leaveEvents : []),
       ...(includeOvertime ? overtimeEvents : []),
       ...(includeLeave ? holidayEvents : []),
+      ...(includeSchedule ? filteredSchedules : []),
     ];
-  }, [approvedLeaves, approvedOvertime, selectedDept, holidays, showLeave, showOvertime]);
+  }, [
+    approvedLeaves,
+    approvedOvertime,
+    scheduleItems,
+    selectedDept,
+    holidays,
+    showLeave,
+    showOvertime,
+    showSchedule,
+    onlyMine,
+    currentUser,
+  ]);
 
   const getEventsForDate = useCallback(
     (date) => {
@@ -542,6 +1011,10 @@ export default function Schedule() {
   const onMouseDown = (e) => {
     if (Platform.OS !== "web") return;
     const x = e?.nativeEvent?.pageX;
+    const y = e?.nativeEvent?.pageY;
+    if (typeof x === "number" && typeof y === "number") {
+      lastPointerRef.current = { x, y };
+    }
     if (typeof x === "number") setDragStartX(x);
   };
 
@@ -568,6 +1041,10 @@ export default function Schedule() {
 
   const onTouchStart = (e) => {
     const x = e?.nativeEvent?.pageX;
+    const y = e?.nativeEvent?.pageY;
+    if (typeof x === "number" && typeof y === "number") {
+      lastPointerRef.current = { x, y };
+    }
     if (typeof x === "number") setDragStartX(x);
   };
 
@@ -591,173 +1068,305 @@ export default function Schedule() {
     setDragStartX(null);
   };
 
-  const allChecked = showLeave && showOvertime;
+  const allChecked = showLeave && showOvertime && showSchedule;
 
   const toggleAll = () => {
     const next = !allChecked;
     setShowLeave(next);
     setShowOvertime(next);
+    setShowSchedule(next);
   };
 
-  const FilterCheckbox = ({ label, checked, onPress }) => (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        paddingVertical: 9,
-        paddingHorizontal: 8,
-        borderWidth: 1,
-        borderColor: "#E2E8F0",
-        borderRadius: 8,
-        backgroundColor: "white",
-      }}
-    >
-      <Checkbox value={checked} onValueChange={onPress} color="#121D6D" />
-      <Text style={{ fontSize: 12, color: "#0F172A", fontWeight: "600" }}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  const getFilterLabel = () => {
+    if (allChecked) return "전체";
+    const active = [
+      showLeave ? "휴가" : null,
+      showOvertime ? "연장 근로" : null,
+      showSchedule ? "작업 일정" : null,
+    ].filter(Boolean);
+    if (active.length === 0) return "없음";
+    return active.join(", ");
+  };
 
   return (
-    <View style={{ flex: 1, paddingTop: 12, backgroundColor: "#FFFFFF" }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 8,
-          gap: 12,
-          position: "relative",
-          zIndex: 10,
-          elevation: 10,
-        }}
-      >
-        <Text style={{ fontSize: 22, fontWeight: "bold" }}>
-          {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
-        </Text>
-
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View
-            style={{
-              position: "relative",
-              zIndex: 20,
-              elevation: 20,
-            }}
-          >
-          <TouchableOpacity
-            onPress={() => setDeptOpen(!deptOpen)}
-            style={{
-              width: 200,
-              height: 40,
-              borderWidth: 1,
-              borderColor: "#E5E7EB",
-              borderRadius: 8,
-              padding: 10,
-              flexDirection: "row",
-              justifyContent: "space-between",
-              backgroundColor: "white",
-              zIndex: 30,
-              elevation: 30,
-            }}
-          >
-            <Text numberOfLines={1}>부서: {getDeptLabel()}</Text>
-            <Text>{deptOpen ? "▲" : "▼"}</Text>
-          </TouchableOpacity>
-
-          {deptOpen && (
-            <View
-              style={{
-                position: "absolute",
-                top: 40,
-                left: 0,
-                width: 200,
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                backgroundColor: "white",
-                zIndex: 9999,
-                elevation: 9999,
-              }}
+    <View style={[styles.page, isMobile && styles.pageMobile]}>
+      <View style={[styles.toolbar, isMobile && styles.toolbarMobile]}>
+        <View style={[styles.toolbarRow, isMobile && styles.toolbarRowMobile]}>
+          <View style={[styles.dateRow, isMobile && styles.dateRowMobile]}>
+            <TouchableOpacity
+              onPress={() =>
+                setCurrentDate((prev) =>
+                  normalizeForMode(moveByMode(prev, mode, -1), mode)
+                )
+              }
+              style={styles.navButton}
             >
-              {departments.length === 0 ? (
-                <View style={{ padding: 10 }}>
-                  <Text style={{ color: "#6B7280" }}>
-                    표시할 부서가 없습니다
-                  </Text>
-                </View>
-              ) : (
-                departments.map((dept) => {
-                  const isSelected = selectedDept.includes(dept);
-                  return (
-                    <TouchableOpacity
-                      key={dept}
-                      onPress={() => toggleDept(dept)}
-                      style={{
-                        padding: 10,
-                        flexDirection: "row",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Image
-                        source={departmentIcon}
-                        style={{ width: 18, height: 18, marginRight: 8 }}
-                        resizeMode="contain"
-                      />
-                      <Text
-                        style={{ color: isSelected ? "#2563EB" : "#6B7280" }}
-                      >
-                        {dept}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </View>
-          )}
+              <Text style={styles.navButtonText}>◀</Text>
+            </TouchableOpacity>
+            <Text
+              style={[
+                styles.monthTitle,
+                isMobile && styles.monthTitleMobile,
+              ]}
+            >
+              {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
+            </Text>
+            <TouchableOpacity
+              onPress={() =>
+                setCurrentDate((prev) =>
+                  normalizeForMode(moveByMode(prev, mode, +1), mode)
+                )
+              }
+              style={styles.navButton}
+            >
+              <Text style={styles.navButtonText}>▶</Text>
+            </TouchableOpacity>
           </View>
 
-        <TouchableOpacity
-          onPress={() => setOnlyMine((v) => !v)}
-          style={{
-            height: 40,
-            paddingVertical: 10,
-            paddingHorizontal: 15,
-            backgroundColor: "white",
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor: "#E5E7EB",
-          }}
-          disabled={loading}
-        >
-          <Text>{onlyMine ? "전체 일정 보기" : "내 일정만 보기"}</Text>
-        </TouchableOpacity>
+          <View
+            style={[
+              styles.legendWrap,
+              isMobile && styles.legendWrapMobile,
+            ]}
+          >
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={styles.legendSwatchLeave} />
+                <Text
+                  style={[
+                    styles.legendText,
+                    isMobile && styles.legendTextMobile,
+                  ]}
+                >
+                  휴가
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={styles.legendSwatchOvertime} />
+                <Text
+                  style={[
+                    styles.legendText,
+                    isMobile && styles.legendTextMobile,
+                  ]}
+                >
+                  연장 근로
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={styles.legendSwatchSchedule} />
+                <Text
+                  style={[
+                    styles.legendText,
+                    isMobile && styles.legendTextMobile,
+                  ]}
+                >
+                  작업 일정
+                </Text>
+              </View>
+            </View>
+          </View>
 
-        <View style={{ flexDirection: "row", gap: 10, padding: 6 }}>
-          <FilterCheckbox
-            label="전체"
-            checked={allChecked}
-            onPress={toggleAll}
-          />
-          <FilterCheckbox
-            label="휴가"
-            checked={showLeave}
-            onPress={() => setShowLeave((v) => !v)}
-          />
-          <FilterCheckbox
-            label="연장"
-            checked={showOvertime}
-            onPress={() => setShowOvertime((v) => !v)}
-          />
-        </View>
+          <View
+            style={[
+              styles.controlsRow,
+              isMobile && styles.controlsRowMobile,
+            ]}
+          >
+            <View style={styles.deptWrap}>
+              <TouchableOpacity
+                onPress={() => setDeptOpen(!deptOpen)}
+                style={[
+                  styles.deptButton,
+                  isMobile && styles.deptButtonMobile,
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.deptButtonText,
+                    isNarrow && styles.deptButtonTextSmall,
+                  ]}
+                >
+                  부서: {getDeptLabel()}
+                </Text>
+                <Text style={styles.deptButtonText}>
+                  {deptOpen ? "▲" : "▼"}
+                </Text>
+              </TouchableOpacity>
+
+              {deptOpen && (
+                <View
+                  style={[
+                    styles.deptDropdown,
+                    isMobile && styles.deptDropdownMobile,
+                  ]}
+                >
+                  {departments.length === 0 ? (
+                    <View style={styles.deptEmpty}>
+                      <Text style={styles.deptEmptyText}>
+                        표시할 부서가 없습니다
+                      </Text>
+                    </View>
+                  ) : (
+                    departments.map((dept) => {
+                      const isSelected = selectedDept.includes(dept);
+                      return (
+                        <TouchableOpacity
+                          key={dept}
+                          onPress={() => toggleDept(dept)}
+                          style={styles.deptItem}
+                        >
+                          <Image
+                            source={departmentIcon}
+                            style={styles.deptIcon}
+                            resizeMode="contain"
+                          />
+                          <Text
+                            style={[
+                              styles.deptItemText,
+                              isSelected && styles.deptItemTextActive,
+                            ]}
+                          >
+                            {dept}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </View>
+              )}
+            </View>
+
+            <View style={styles.filterWrap}>
+              <TouchableOpacity
+                onPress={() => setFilterOpen(!filterOpen)}
+                style={[
+                  styles.filterButton,
+                  isMobile && styles.filterButtonMobile,
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.filterButtonText,
+                    isNarrow && styles.filterButtonTextSmall,
+                  ]}
+                >
+                  구분: {getFilterLabel()}
+                </Text>
+                <Text style={styles.filterButtonText}>
+                  {filterOpen ? "▲" : "▼"}
+                </Text>
+              </TouchableOpacity>
+
+              {filterOpen && (
+                <View
+                  style={[
+                    styles.filterDropdown,
+                    isMobile && styles.filterDropdownMobile,
+                  ]}
+                >
+                  <TouchableOpacity
+                    onPress={toggleAll}
+                    style={styles.filterItem}
+                  >
+                    <Checkbox
+                      value={allChecked}
+                      onValueChange={toggleAll}
+                      color="#121D6D"
+                    />
+                    <Text
+                      style={[
+                        styles.filterItemText,
+                        allChecked && styles.filterItemTextActive,
+                      ]}
+                    >
+                      전체
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowLeave((v) => !v)}
+                    style={styles.filterItem}
+                  >
+                    <Checkbox
+                      value={showLeave}
+                      onValueChange={() => setShowLeave((v) => !v)}
+                      color="#121D6D"
+                    />
+                    <Text
+                      style={[
+                        styles.filterItemText,
+                        showLeave && styles.filterItemTextActive,
+                      ]}
+                    >
+                      휴가
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowOvertime((v) => !v)}
+                    style={styles.filterItem}
+                  >
+                    <Checkbox
+                      value={showOvertime}
+                      onValueChange={() => setShowOvertime((v) => !v)}
+                      color="#121D6D"
+                    />
+                    <Text
+                      style={[
+                        styles.filterItemText,
+                        showOvertime && styles.filterItemTextActive,
+                      ]}
+                    >
+                      연장 근로
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowSchedule((v) => !v)}
+                    style={styles.filterItem}
+                  >
+                    <Checkbox
+                      value={showSchedule}
+                      onValueChange={() => setShowSchedule((v) => !v)}
+                      color="#121D6D"
+                    />
+                    <Text
+                      style={[
+                        styles.filterItemText,
+                        showSchedule && styles.filterItemTextActive,
+                      ]}
+                    >
+                      작업 일정
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {!isMobile ? (
+              <TouchableOpacity
+                onPress={() => setOnlyMine((v) => !v)}
+                style={styles.mineButton}
+                disabled={loading}
+              >
+                <Text style={styles.mineButtonText}>
+                  {onlyMine ? "전체 일정 보기" : "내 일정만 보기"}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
       </View>
       <View
-        style={{ flex: 1, zIndex: 0 }}
+        ref={calendarWrapRef}
+        onLayout={() => {
+          if (Platform.OS !== "web") return;
+          if (calendarWrapRef.current?.measureInWindow) {
+            calendarWrapRef.current.measureInWindow((x, y, width, height) => {
+              setContainerRect({ x, y, width, height });
+            });
+          }
+        }}
+        style={{ flex: 1, zIndex: 0, position: "relative" }}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
         onTouchStart={onTouchStart}
@@ -765,17 +1374,19 @@ export default function Schedule() {
       >
         <Calendar
           events={events}
-          height={500}
+          height={calendarHeight}
           mode={mode}
           date={currentDate}
           swipeEnabled={false}
-          maxVisibleEventCount={2}
-          moreLabel="+ {moreCount}개의 일정 더보기"
+          maxVisibleEventCount={isMobile ? 2 : 4}
+          moreLabel={
+            isMobile ? "+ {moreCount} 더보기" : "+ {moreCount}개의 일정 더보기"
+          }
           theme={{
             palette: { moreLabel: "#94A3B8" },
             typography: {
               moreLabel: {
-                fontSize: 12,
+                fontSize: isMobile ? 10 : 12,
                 fontWeight: "500",
                 textAlign: "center",
                 paddingTop: 5,
@@ -789,19 +1400,44 @@ export default function Schedule() {
           onPressDateHeader={(date) =>
             openDayEventsModal(date, getEventsForDate(date))
           }
-          renderEvent={(event, touchableOpacityProps) => (
-            (() => {
-              const style = getLeaveTypeStyle(event?.raw?.leaveType ?? "");
-              return (
-            <DefaultCalendarEventRenderer
-              event={event}
-              touchableOpacityProps={touchableOpacityProps}
-              textColor={style.text ?? "#334155"}
-              showTime={false}
-            />
-              );
-            })()
-          )}
+          renderEvent={(event, touchableOpacityProps) => {
+            const style = getLeaveTypeStyle(event?.raw?.leaveType ?? "");
+            const mergedProps = {
+              ...touchableOpacityProps,
+              onPress: (e) => {
+                openEventModal(event, e);
+                if (touchableOpacityProps?.onPress) {
+                  touchableOpacityProps.onPress(e);
+                }
+              },
+            };
+            return (
+              <TouchableOpacity
+                {...mergedProps}
+                style={[
+                  touchableOpacityProps?.style,
+                  {
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    justifyContent: "center",
+                    overflow: "hidden",
+                  },
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={{
+                    color: style.text ?? "#334155",
+                    fontSize: 12,
+                    flexShrink: 1,
+                  }}
+                >
+                  {event?.title ?? ""}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
           eventCellStyle={(e) => {
             const leaveType = e?.raw?.leaveType ?? "";
             const style = getLeaveTypeStyle(leaveType);
@@ -812,146 +1448,349 @@ export default function Schedule() {
               borderRadius: 6,
             };
           }}
-          onPressEvent={openEventModal}
+          onPressEvent={(event, e) => openEventModal(event, e)}
         />
-      </View>
-      <Modal
-        visible={eventModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={closeEventModal}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={closeEventModal}
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.35)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 20,
-          }}
-        >
+
+        {Platform.OS === "web" && eventModalOpen ? (
           <TouchableOpacity
             activeOpacity={1}
-            onPress={() => {}}
+            onPress={closeEventModal}
             style={{
-              width: "100%",
-              maxWidth: 460,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "transparent",
+              zIndex: 40,
+            }}
+          />
+        ) : null}
+
+        {Platform.OS === "web" && eventModalOpen && selectedEvent ? (
+          <View
+            style={{
+              position: "absolute",
+              top: eventPopoverPos.y,
+              left: eventPopoverPos.x,
+              width: popoverWidth,
+              maxHeight: popoverMaxHeight,
               backgroundColor: "#FFFFFF",
-              borderRadius: 20,
-              padding: 18,
+              borderRadius: 10,
               borderWidth: 1,
               borderColor: "#E2E8F0",
+              padding: popoverPadding,
               shadowColor: "#0F172A",
-              shadowOpacity: 0.15,
-              shadowRadius: 16,
-              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.08,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 6 },
               elevation: 6,
+              zIndex: 50,
             }}
           >
+            {(() => {
+              const isHoliday = detail?.isHoliday;
+              const isOvertime = detail?.isOvertime || leaveType === "연장근로";
+              const dotColor = isHoliday
+                ? getLeaveTypeStyle("공휴일").border
+                : isOvertime
+                ? getLeaveTypeStyle("연장근로").border
+                : getLeaveTypeStyle(leaveType || "연차").border;
+              return (
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: 12,
+                marginBottom: 18,
               }}
             >
-              <View>
-                <Text style={{ fontSize: 20, fontWeight: "bold" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 999,
+                    backgroundColor: dotColor,
+                  }}
+                />
+                <Text
+                  style={{ fontSize: 18, fontWeight: "700", color: "#0F172A" }}
+                >
                   일정 상세
                 </Text>
               </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginBottom: 14,
-                }}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                {canEditDetail ? (
+                  <TouchableOpacity onPress={handleEditDetail}>
+                    <Text style={{ fontSize: 14, color: "#2563EB" }}>수정</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={closeEventModal}>
+                  <Text style={{ fontSize: 14, color: "#64748B" }}>닫기</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+              );
+            })()}
+
+            {isSchedule ? (
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 4 }}
+                showsVerticalScrollIndicator
               >
-                <View
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    borderRadius: 999,
-                    backgroundColor: "#DBEAFE",
-                  }}
-                >
-                  <Text style={{ color: "#121D6D", fontWeight: "bold" }}>
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                    이름
+                  </Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                    {displayName}
+                  </Text>
+                </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      작업 번호
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.jobNumber || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      선명
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.vesselName || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      호선번호/고유번호
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleHullInfo}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      기간
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {timeLabel}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      고객사
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.customer || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      지역
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.region || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      작업
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.workType || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      종류
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.systemType || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      작업내용
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.jobDescription || "-"}
+                    </Text>
+                  </View>
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{ color: "#94A3B8", fontSize: 12, marginBottom: 4 }}
+                    >
+                      비고
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.note || "-"}
+                    </Text>
+                  </View>
+              </ScrollView>
+            ) : (
+              <View>
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                    이름
+                  </Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                    {displayName}
+                  </Text>
+                </View>
+                <View style={{ marginBottom: 12 }}>
+                  <Text
+                    style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}
+                  >
+                    종류
+                  </Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
                     {leaveType}
                   </Text>
                 </View>
-                <View
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    borderRadius: 999,
-                    backgroundColor: "#E2E8F0",
-                  }}
-                >
-                  <Text style={{ color: "#334155" }}>{departmentName}</Text>
-                </View>
-              </View>
-
-              {selectedEvent?.isMine ? (
-                <View
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    borderRadius: 999,
-                    backgroundColor: "#DCFCE7",
-                  }}
-                >
-                  <Text style={{ color: "#15803D", fontWeight: "bold" }}>
-                    내 일정
+                <View style={{ marginBottom: 12 }}>
+                  <Text
+                    style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}
+                  >
+                    기간
+                  </Text>
+                  <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                    {timeLabel}
                   </Text>
                 </View>
-              ) : null}
-            </View>
+                {!detail?.isHoliday && (
+                  <View>
+                    <Text style={{ color: "#94A3B8", fontSize: 13, marginBottom: 4 }}>
+                      사유
+                    </Text>
+                    <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                      {detail?.reason ?? "-"}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        ) : null}
+      </View>
+      {Platform.OS !== "web" && (
+        <Modal
+          visible={eventModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={closeEventModal}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={closeEventModal}
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.35)",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: 20,
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => {}}
+            style={{
+              width: "100%",
+              maxWidth: isNarrow ? 360 : 460,
+              backgroundColor: "#FFFFFF",
+              borderRadius: isNarrow ? 16 : 20,
+              padding: isNarrow ? 14 : 18,
+              borderWidth: 1,
+              borderColor: "#E2E8F0",
+                shadowColor: "#0F172A",
+                shadowOpacity: 0.15,
+                shadowRadius: 16,
+                shadowOffset: { width: 0, height: 8 },
+                elevation: 6,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                }}
+              >
+                <View>
+                  <Text style={{ fontSize: 20, fontWeight: "bold" }}>
+                    일정 상세
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginBottom: 14,
+                  }}
+                >
+                  <View
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 999,
+                      backgroundColor: "#DBEAFE",
+                    }}
+                  >
+                    <Text style={{ color: "#121D6D", fontWeight: "bold" }}>
+                      {leaveType}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 999,
+                      backgroundColor: "#E2E8F0",
+                    }}
+                  >
+                    <Text style={{ color: "#334155" }}>{departmentName}</Text>
+                  </View>
+                </View>
 
-            <View
-              style={{
-                backgroundColor: "white",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                borderRadius: 14,
-                padding: 12,
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ color: "#64748B", marginBottom: 6 }}>이름</Text>
-              <Text style={{ fontSize: 16 }}>{displayName}</Text>
-            </View>
-            <View
-              style={{
-                backgroundColor: "white",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                borderRadius: 14,
-                padding: 12,
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ color: "#64748B", marginBottom: 6 }}>종류</Text>
-              <Text style={{ fontSize: 15 }}>{leaveType}</Text>
-            </View>
-            <View
-              style={{
-                backgroundColor: "white",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                borderRadius: 14,
-                padding: 12,
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ color: "#64748B", marginBottom: 6 }}>기간</Text>
-              <Text style={{ fontSize: 15 }}>{timeLabel}</Text>
-            </View>
+                {selectedEvent?.isMine ? (
+                  <View
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 999,
+                      backgroundColor: "#DCFCE7",
+                    }}
+                  >
+                    <Text style={{ color: "#15803D", fontWeight: "bold" }}>
+                      내 일정
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
 
-            {!detail?.isHoliday && (
               <View
                 style={{
                   backgroundColor: "white",
@@ -959,31 +1798,280 @@ export default function Schedule() {
                   borderColor: "#E2E8F0",
                   borderRadius: 14,
                   padding: 12,
-                  marginBottom: 16,
+                  marginBottom: 12,
                 }}
               >
-                <Text style={{ color: "#64748B", marginBottom: 6 }}>사유</Text>
-                <Text style={{ fontSize: 15, color: "#0F172A" }}>
-                  {detail?.reason ?? "-"}
-                </Text>
+                <Text style={{ color: "#64748B", marginBottom: 6 }}>이름</Text>
+                <Text style={{ fontSize: 16 }}>{displayName}</Text>
               </View>
-            )}
+              {isSchedule ? (
+                <>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      작업 번호
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.jobNumber || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      선명
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.vesselName || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      호선번호/고유번호
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleHullInfo}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      기간
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {timeLabel}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      고객사
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.customer || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      지역
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.region || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      작업
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.workType || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      종류
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>
+                      {scheduleDetail?.systemType || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      작업내용
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.jobDescription || "-"}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6, fontSize: 12 }}>
+                      비고
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#0F172A" }}>
+                      {scheduleDetail?.note || "-"}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6 }}>
+                      종류
+                    </Text>
+                    <Text style={{ fontSize: 15 }}>{leaveType}</Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: "white",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      borderRadius: 14,
+                      padding: 12,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#64748B", marginBottom: 6 }}>
+                      기간
+                    </Text>
+                    <Text style={{ fontSize: 15 }}>{timeLabel}</Text>
+                  </View>
 
-            <TouchableOpacity
-              onPress={closeEventModal}
-              style={{
-                alignSelf: "flex-end",
-                paddingVertical: 10,
-                paddingHorizontal: 18,
-                borderRadius: 999,
-                backgroundColor: "#121D6D",
-              }}
-            >
-              <Text style={{ color: "white", fontWeight: "bold" }}>닫기</Text>
+                  {!detail?.isHoliday && (
+                    <View
+                      style={{
+                        backgroundColor: "white",
+                        borderWidth: 1,
+                        borderColor: "#E2E8F0",
+                        borderRadius: 14,
+                        padding: 12,
+                        marginBottom: 16,
+                      }}
+                    >
+                      <Text style={{ color: "#64748B", marginBottom: 6 }}>
+                        사유
+                      </Text>
+                      <Text style={{ fontSize: 15, color: "#0F172A" }}>
+                        {detail?.reason ?? "-"}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  gap: 8,
+                }}
+              >
+                {canEditDetail ? (
+                  <TouchableOpacity
+                    onPress={handleEditDetail}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 18,
+                      borderRadius: 999,
+                      backgroundColor: "#E0E7FF",
+                    }}
+                  >
+                    <Text style={{ color: "#1D4ED8", fontWeight: "bold" }}>
+                      수정
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  onPress={closeEventModal}
+                  style={{
+                    paddingVertical: 10,
+                    paddingHorizontal: 18,
+                    borderRadius: 999,
+                    backgroundColor: "#121D6D",
+                  }}
+                >
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    닫기
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        </Modal>
+      )}
       <Modal
         visible={dayEventsModalOpen}
         transparent
@@ -1006,10 +2094,10 @@ export default function Schedule() {
             onPress={() => {}}
             style={{
               width: "100%",
-              maxWidth: 460,
+              maxWidth: isNarrow ? 360 : 460,
               backgroundColor: "#FFFFFF",
-              borderRadius: 20,
-              padding: 18,
+              borderRadius: isNarrow ? 16 : 20,
+              padding: isNarrow ? 14 : 18,
               borderWidth: 1,
               borderColor: "#E2E8F0",
               shadowColor: "#0F172A",
@@ -1028,7 +2116,7 @@ export default function Schedule() {
               </Text>
             </View>
 
-            <ScrollView style={{ maxHeight: 360 }}>
+            <ScrollView style={{ maxHeight: isMobile ? 300 : 360 }}>
               {dayEvents.length === 0 ? (
                 <Text style={{ color: "#64748B" }}>
                   해당 날짜에 일정이 없습니다.
@@ -1109,3 +2197,261 @@ export default function Schedule() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    paddingTop: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  pageMobile: {
+    paddingTop: 8,
+  },
+  toolbar: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 12,
+    position: "relative",
+    zIndex: 10,
+    elevation: 10,
+  },
+  toolbarMobile: {
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  toolbarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  toolbarRowMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 12,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  dateRowMobile: {
+    justifyContent: "center",
+  },
+  navButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navButtonText: {
+    fontSize: 14,
+    color: "#475569",
+  },
+  monthTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+  },
+  monthTitleMobile: {
+    fontSize: 18,
+  },
+  legendWrap: {
+    flex: 1,
+    alignItems: "center",
+  },
+  legendWrapMobile: {
+    alignItems: "flex-start",
+  },
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendSwatchLeave: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: "#FCE7F3",
+    borderWidth: 1,
+    borderColor: "#F9A8D4",
+  },
+  legendSwatchOvertime: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: "#E0F2FE",
+    borderWidth: 1,
+    borderColor: "#93C5FD",
+  },
+  legendSwatchSchedule: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: "#FEF9C3",
+    borderWidth: 1,
+    borderColor: "#FACC15",
+  },
+  legendText: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  legendTextMobile: {
+    fontSize: 11,
+  },
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  controlsRowMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 10,
+  },
+  deptWrap: {
+    position: "relative",
+    zIndex: 20,
+    elevation: 20,
+  },
+  deptButton: {
+    width: 200,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "white",
+    zIndex: 30,
+    elevation: 30,
+  },
+  deptButtonMobile: {
+    width: "100%",
+  },
+  deptButtonText: {
+    fontSize: 13,
+    color: "#0F172A",
+  },
+  deptButtonTextSmall: {
+    fontSize: 12,
+  },
+  deptDropdown: {
+    position: "absolute",
+    top: 40,
+    left: 0,
+    width: 200,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "white",
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  deptDropdownMobile: {
+    width: "100%",
+  },
+  deptEmpty: {
+    padding: 10,
+  },
+  deptEmptyText: {
+    color: "#6B7280",
+  },
+  deptItem: {
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  deptIcon: {
+    width: 18,
+    height: 18,
+    marginRight: 8,
+  },
+  deptItemText: {
+    color: "#6B7280",
+  },
+  deptItemTextActive: {
+    color: "#2563EB",
+  },
+  mineButton: {
+    height: 40,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    backgroundColor: "white",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mineButtonMobile: {
+    width: "100%",
+  },
+  mineButtonText: {
+    fontSize: 13,
+    color: "#0F172A",
+  },
+  mineButtonTextSmall: {
+    fontSize: 12,
+  },
+  filterWrap: {
+    position: "relative",
+    zIndex: 20,
+    elevation: 20,
+  },
+  filterButton: {
+    width: 200,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "white",
+    zIndex: 30,
+    elevation: 30,
+  },
+  filterButtonMobile: {
+    width: "100%",
+  },
+  filterButtonText: {
+    fontSize: 13,
+    color: "#0F172A",
+  },
+  filterButtonTextSmall: {
+    fontSize: 12,
+  },
+  filterDropdown: {
+    position: "absolute",
+    top: 40,
+    left: 0,
+    width: 200,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "white",
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  filterDropdownMobile: {
+    width: "100%",
+  },
+  filterItem: {
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  filterItemText: {
+    color: "#6B7280",
+  },
+  filterItemTextActive: {
+    color: "#2563EB",
+  },
+});

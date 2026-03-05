@@ -9,9 +9,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
+  useWindowDimensions,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import Checkbox from "expo-checkbox";
 import api from "../../api/api";
+import PageLayout from "../../components/PageLayout";
+import showIcon from "../../../assets/icon/show.png";
 
 const columns = [
   { key: "name", title: "이름", width: "10%", sortable: true },
@@ -21,6 +26,7 @@ const columns = [
   { key: "requestDate", title: "요청일자", width: "12%", sortable: true },
   { key: "timeRange", title: "작업시간", width: "12%", sortable: true },
   { key: "jobDescription", title: "작업내용", width: "16%", sortable: true },
+  { key: "action", title: "보기", width: "8%", sortable: false },
 ];
 
 function trimSeconds(value) {
@@ -40,6 +46,14 @@ function formatTimeRange(startTime, endTime) {
 }
 
 export default function Application() {
+  const navigation = useNavigation();
+  const { width, height } = useWindowDimensions();
+  const isMobile = width < 800;
+  const tableMinWidth = isMobile ? 980 : "100%";
+  const tableBodyHeight = Math.max(
+    240,
+    Math.min(isMobile ? 360 : 460, height - (isMobile ? 380 : 320))
+  );
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -57,10 +71,13 @@ export default function Application() {
 
         const res = await api.get("/overtime");
         const list = Array.isArray(res.data) ? res.data : [];
+        const approvedOnly = list.filter(
+          (item) => item?.approvalStatus === "승인"
+        );
 
         if (!mounted) return;
 
-        const mapped = list.map((e) => ({
+        const mapped = approvedOnly.map((e) => ({
           id: e.id,
           name: e.employee?.name ?? "-",
           jobNumber: e.jobNumber ?? "-",
@@ -70,6 +87,20 @@ export default function Application() {
           timeRange: formatTimeRange(e.startTime, e.endTime),
           jobDescription: e.jobDescription ?? "-",
           status: e.approvalStatusDisplay ?? e.approvalStatus ?? "-",
+          detail: {
+            name: e.employee?.name ?? "",
+            department: e.employee?.department?.name ?? "",
+            jobNumber: e.jobNumber ?? "",
+            vesselName: e.vesselName ?? "",
+            hullNo: e.hullNo ?? "",
+            requestDate: e.requestDate ?? "",
+            startTime: e.startTime ?? "",
+            endTime: e.endTime ?? "",
+            jobDescription: e.jobDescription ?? "",
+            imageUrl: e.imageUrl ?? "",
+            status: e.approvalStatusDisplay ?? e.approvalStatus ?? "",
+            rejectionReason: e.rejectionReason ?? "—",
+          },
         }));
 
         setData(mapped);
@@ -168,7 +199,7 @@ export default function Application() {
 
   const renderHeader = () => (
     <View style={styles.headerRow}>
-      <View style={styles.checkCell}>
+      <View style={[styles.checkCell, isMobile && styles.checkCellMobile]}>
         <Checkbox
           value={
             typeFilteredData.length > 0 &&
@@ -181,11 +212,11 @@ export default function Application() {
       {columns.map((col) => (
         <TouchableOpacity
           key={col.key}
-          style={[styles.cell, { width: col.width }]}
+          style={[styles.cell, isMobile && styles.cellMobile, { width: col.width }]}
           activeOpacity={0.7}
           onPress={() => col.sortable && handleSort(col.key)}
         >
-          <Text style={styles.headerText}>
+          <Text style={[styles.headerText, isMobile && styles.headerTextMobile]}>
             {col.title}
             {sort.key === col.key && (
               <Text style={styles.sortIcon}>
@@ -195,7 +226,6 @@ export default function Application() {
           </Text>
         </TouchableOpacity>
       ))}
-      <View style={styles.moreHeaderCell} />
     </View>
   );
 
@@ -212,64 +242,125 @@ export default function Application() {
   const renderRow = ({ item }) => {
     return (
       <View style={styles.row}>
-        <View style={styles.checkCell}>
+        <View style={[styles.checkCell, isMobile && styles.checkCellMobile]}>
           <Checkbox
             value={selectedIds.has(item.id)}
             onValueChange={() => toggleSelectOne(item.id)}
             color="#121D6D"
           />
         </View>
-        {columns.map((col) => (
-          <View key={col.key} style={[styles.cell, { width: col.width }]}>
-            <Text style={styles.cellText} numberOfLines={1}>
-              {item[col.key]}
-            </Text>
-          </View>
-        ))}
+        {columns.map((col) => {
+          if (col.key === "action") {
+            return (
+              <View
+                key={col.key}
+                style={[styles.cell, isMobile && styles.cellMobile, { width: col.width }]}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.detailButton,
+                    isMobile && styles.detailButtonMobile,
+                  ]}
+                  onPress={() =>
+                    navigation.navigate(
+                      "OverTimeStatusContent",
+                      item.detail ?? {}
+                    )
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.detailButtonText,
+                      isMobile && styles.detailButtonTextMobile,
+                    ]}
+                  >
+                    보기
+                  </Text>
+                  <Image
+                    source={showIcon}
+                    style={[
+                      styles.detailButtonIcon,
+                      isMobile && styles.detailButtonIconMobile,
+                    ]}
+                  />
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          return (
+            <View
+              key={col.key}
+              style={[styles.cell, isMobile && styles.cellMobile, { width: col.width }]}
+            >
+              <Text
+                style={[styles.cellText, isMobile && styles.cellTextMobile]}
+                numberOfLines={1}
+              >
+                {item[col.key]}
+              </Text>
+            </View>
+          );
+        })}
 
       </View>
     );
   };
 
-  return (
-    <View style={styles.page}>
-      <View style={styles.filterCard}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>연장 근로 신청 목록</Text>
-          <Text style={styles.countText}>
-            {typeFilteredData.length}/{data.length}
-          </Text>
-        </View>
+  const breadcrumb = [
+    { label: "홈", route: "Home" },
+    { label: "연장 근로 신청", route: "OverTimeForm" },
+    { label: "승인된 연장 근로" },
+  ];
 
-        <View style={styles.filterRow}>
-          <View style={styles.searchGroup}>
-            <Text style={styles.filterLabel}>검색</Text>
-            <TextInput
-              value={nameQuery}
-              onChangeText={setNameQuery}
-              placeholder="이름 검색"
-              style={styles.searchInput}
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
+  return (
+    <PageLayout
+      breadcrumb={breadcrumb}
+      scroll={false}
+      contentStyle={[
+        styles.pageContent,
+        isMobile && styles.pageContentMobile,
+      ]}
+    >
+      <View style={[styles.page, isMobile && styles.pageMobile]}>
+        <View style={[styles.filterCard, isMobile && styles.filterCardMobile]}>
+          <View style={[styles.titleRow, isMobile && styles.titleRowMobile]}>
+            <Text style={styles.title}>연장 근로 신청 목록</Text>
+            <Text style={styles.countText}>
+              {typeFilteredData.length}/{data.length}
+            </Text>
+          </View>
+
+          <View style={[styles.filterRow, isMobile && styles.filterRowMobile]}>
+            <View
+              style={[styles.searchGroup, isMobile && styles.searchGroupMobile]}
+            >
+              <Text style={styles.filterLabel}>검색</Text>
+              <TextInput
+                value={nameQuery}
+                onChangeText={setNameQuery}
+                placeholder="이름 검색"
+                style={[styles.searchInput, isMobile && styles.searchInputMobile]}
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.tableCard}>
-        <View style={styles.tableHeaderRow}>
-          <Text style={styles.tableTitle}>연장 근로 신청 내역</Text>
-          <TouchableOpacity
-            style={[
-              styles.downloadBtn,
-              selectedIds.size === 0 && styles.downloadBtnDisabled,
-            ]}
-            onPress={downloadSelected}
-            disabled={selectedIds.size === 0}
-          >
-            <Text style={styles.downloadBtnText}>선택 다운로드</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={[styles.tableCard, isMobile && styles.tableCardMobile]}>
+          <View style={styles.tableHeaderRow}>
+            <Text style={styles.tableTitle}>연장 근로 신청 내역</Text>
+            <TouchableOpacity
+              style={[
+                styles.downloadBtn,
+                selectedIds.size === 0 && styles.downloadBtnDisabled,
+              ]}
+              onPress={downloadSelected}
+              disabled={selectedIds.size === 0}
+            >
+              <Text style={styles.downloadBtnText}>선택 다운로드</Text>
+            </TouchableOpacity>
+          </View>
         {loading && (
           <View style={{ paddingVertical: 20, alignItems: "center" }}>
             <ActivityIndicator />
@@ -285,9 +376,14 @@ export default function Application() {
 
         {!loading && (
           <ScrollView horizontal contentContainerStyle={styles.tableScrollContent}>
-            <View style={styles.tableWrap}>
+            <View style={[styles.tableWrap, { minWidth: tableMinWidth }]}>
               {renderHeader()}
-              <View style={styles.tableBody}>
+              <View
+                style={[
+                  styles.tableBody,
+                  { height: tableBodyHeight },
+                ]}
+              >
                 <FlatList
                   data={typeFilteredData}
                   keyExtractor={(item) => String(item.id)}
@@ -304,7 +400,8 @@ export default function Application() {
           </ScrollView>
         )}
       </View>
-    </View>
+      </View>
+    </PageLayout>
   );
 }
 
@@ -323,10 +420,22 @@ function FilterCheckbox({ label, checked, onChange }) {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 20,
     backgroundColor: "#F3F4F6",
     flex: 1,
     gap: 16,
+  },
+  pageMobile: {
+    gap: 12,
+  },
+  pageContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  pageContentMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 18,
   },
   filterCard: {
     backgroundColor: "#FFFFFF",
@@ -336,10 +445,18 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 14,
   },
+  filterCardMobile: {
+    padding: 12,
+    gap: 12,
+  },
   titleRow: {
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
+  },
+  titleRowMobile: {
+    flexWrap: "wrap",
+    gap: 6,
   },
   title: { fontSize: 18, fontWeight: "700", color: "#0F172A" },
   countText: { fontSize: 12, color: "#64748B" },
@@ -348,6 +465,12 @@ const styles = StyleSheet.create({
     gap: 16,
     alignItems: "flex-end",
     flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  filterRowMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 12,
   },
   downloadBtn: {
     paddingVertical: 8,
@@ -369,6 +492,9 @@ const styles = StyleSheet.create({
   },
   searchGroup: {
     width: 300,
+  },
+  searchGroupMobile: {
+    width: "100%",
   },
   filterLabel: {
     fontSize: 12,
@@ -407,6 +533,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     backgroundColor: "#fff",
   },
+  searchInputMobile: {
+    height: 38,
+  },
 
   tableCard: {
     backgroundColor: "#FFFFFF",
@@ -415,6 +544,9 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     padding: 12,
     minHeight: 240,
+  },
+  tableCardMobile: {
+    padding: 10,
   },
   tableHeaderRow: {
     flexDirection: "row",
@@ -450,10 +582,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  checkCellMobile: {
+    width: 56,
+  },
 
   cell: { padding: 12, justifyContent: "center" },
+  cellMobile: { paddingVertical: 8, paddingHorizontal: 8 },
   headerText: { fontWeight: "600" },
+  headerTextMobile: { fontSize: 12 },
   sortIcon: { color: "#64748B", fontWeight: "600" },
   cellText: { color: "#333" },
+  cellTextMobile: { fontSize: 12 },
+  detailButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    justifyContent: "space-between",
+  },
+  detailButtonMobile: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 4,
+  },
+  detailButtonText: { fontSize: 12, color: "#0F172A" },
+  detailButtonTextMobile: { fontSize: 11 },
+  detailButtonIcon: { width: 14, height: 14, resizeMode: "contain" },
+  detailButtonIconMobile: { width: 12, height: 12 },
 
 });

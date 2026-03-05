@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import pdf from "../../../../assets/img/pdf.png";
@@ -24,6 +25,35 @@ function formatTimeRange(startTime, endTime) {
   if (!startTime && !endTime) return "-";
   if (!endTime) return startTime;
   return `${startTime} ~ ${endTime}`;
+}
+
+function normalizeApproverName(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    return (
+      value?.name ??
+      value?.employeeName ??
+      value?.employee?.name ??
+      ""
+    ).toString().trim();
+  }
+  return String(value).trim();
+}
+
+function normalizeApproverNames(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeApproverName(item))
+      .filter((name) => name.length > 0);
+  }
+  const str = String(value).trim();
+  if (!str) return [];
+  return str
+    .split(/[>,]/)
+    .map((name) => name.trim())
+    .filter(Boolean);
 }
 
 export default function Status() {
@@ -54,8 +84,12 @@ export default function Status() {
         requestDate: e.requestDate ?? "",
         startTime: e.startTime ?? "",
         endTime: e.endTime ?? "",
+        imageUrl: e.imageUrl ?? "",
 
         status: e.approvalStatusDisplay ?? "",
+        approvalStatus: e.approvalStatus ?? e.approvalStatusDisplay ?? "",
+        approverNames: e.approverNames ?? [],
+        currentApprover: e.currentApprover ?? "",
 
         rejectionReason: e.rejectionReason ?? "—",
         file: pdf,
@@ -129,6 +163,7 @@ export default function Status() {
           <Item
             key={item.id}
             item={item}
+            listType="waiting"
             onDeleted={() => fetchLeaves(undefined, { silent: true })}
           />
         ))}
@@ -143,6 +178,7 @@ export default function Status() {
           <Item
             key={item.id}
             item={item}
+            listType="done"
             onDeleted={() => fetchLeaves(undefined, { silent: true })}
           />
         ))}
@@ -152,6 +188,7 @@ export default function Status() {
 }
 
 function Section({ title, count, emptyText, children }) {
+  const shouldScroll = count > 3;
   return (
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeader}>
@@ -163,6 +200,10 @@ function Section({ title, count, emptyText, children }) {
 
       {count === 0 ? (
         <Text style={styles.emptyText}>{emptyText}</Text>
+      ) : shouldScroll ? (
+        <ScrollView style={styles.sectionScroll} showsVerticalScrollIndicator>
+          {children}
+        </ScrollView>
       ) : (
         children
       )}
@@ -170,13 +211,49 @@ function Section({ title, count, emptyText, children }) {
   );
 }
 
-function Item({ item, onDeleted }) {
+function Item({ item, onDeleted, listType }) {
   const navigation = useNavigation();
 
-  const statusTheme = STATUS_STYLE[item.status] || STATUS_STYLE["대기"];
+  const isWaiting = listType === "waiting";
+  const isDone = listType === "done";
+  const statusThemeKey = item.status || item.approvalStatus || "대기";
+  const statusTheme = STATUS_STYLE[statusThemeKey] || STATUS_STYLE["대기"];
+  const statusLabel = isDone
+    ? item.approvalStatus || item.status || "-"
+    : item.status || "-";
+  const approverNames = normalizeApproverNames(item.approverNames);
+  const currentApprover = normalizeApproverName(item.currentApprover);
 
+  const hidePdf = item.status !== "승인";
   const hideEdit = item.type === "경조사" || item.status === "취소";
-  const hideCancel = item.status === "취소";
+  const hideCancel = item.status === "취소" ||item.status === "반려";
+
+  const downloadPdf = async () => {
+    try {
+      const res = await api.get(`/overtime/${item.id}/download`, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `OverTime_application_form_${item.name}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.log(
+        "pdf download error:",
+        e?.response?.status,
+        e?.response?.data,
+      );
+      Alert.alert("오류", "PDF 다운로드에 실패했습니다.");
+    }
+  };
 
   const cancelForm = async () => {
     try {
@@ -199,6 +276,7 @@ function Item({ item, onDeleted }) {
       requestDate: item.requestDate,
       startTime: item.startTime,
       endTime: item.endTime,
+      imageUrl: item.imageUrl,
     });
   };
 
@@ -224,9 +302,31 @@ function Item({ item, onDeleted }) {
           <View
             style={[styles.badgeDot, { backgroundColor: statusTheme.dot }]}
           />
-          <Text style={[styles.badgeText, { color: statusTheme.text }]}>
-            {item.status}
-          </Text>
+          {isWaiting ? (
+            <Text style={[styles.badgeText, { color: statusTheme.text }]}>
+              {approverNames.length === 0
+                ? "-"
+                : approverNames.map((name, index) => {
+                    const isCurrent = name === currentApprover;
+                    return (
+                      <Text
+                        key={`${name}-${index}`}
+                        style={isCurrent ? styles.badgeTextCurrent : styles.badgeText}
+                      >
+                        {name}
+                        {null}
+                        {index < approverNames.length - 1 ? (
+                          <Text style={styles.badgeTextSeparator}> &gt; </Text>
+                        ) : null}
+                      </Text>
+                    );
+                  })}
+            </Text>
+          ) : (
+            <Text style={[styles.badgeText, { color: statusTheme.text }]}>
+              {statusLabel}
+            </Text>
+          )}
         </View>
 
         <View style={{ flexDirection: "row", gap: 8 }}>
@@ -252,6 +352,18 @@ function Item({ item, onDeleted }) {
               activeOpacity={0.7}
             >
               <Text style={[styles.pdfText, { color: "#DC2626" }]}>취소</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* PDF */}
+          {!hidePdf && (
+            <TouchableOpacity
+              style={styles.pdfBtn}
+              onPress={downloadPdf}
+              activeOpacity={0.7}
+            >
+              <Image source={item.file} style={styles.pdfIcon} />
+              <Text style={styles.pdfText}>PDF</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -301,6 +413,9 @@ const styles = {
   countText: { fontWeight: "700", color: "#334155" },
 
   emptyText: { textAlign: "center", color: "#94A3B8", paddingVertical: 18 },
+  sectionScroll: {
+    maxHeight: 360,
+  },
 
   itemCard: {
     backgroundColor: "#FFFFFF",
@@ -331,11 +446,16 @@ const styles = {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
-    height: 28,
+    paddingVertical: 6,
     borderRadius: 14,
+    flexWrap: "wrap",
+    maxWidth: 260,
+    alignSelf: "flex-end",
   },
   badgeDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  badgeText: { fontSize: 13, fontWeight: "800" },
+  badgeText: { fontSize: 12, fontWeight: "700" },
+  badgeTextCurrent: { fontSize: 13, fontWeight: "800", color: "#0F172A" },
+  badgeTextSeparator: { fontSize: 12, fontWeight: "700", color: "#475569" },
 
   pdfBtn: {
     flexDirection: "row",

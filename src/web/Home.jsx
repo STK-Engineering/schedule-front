@@ -4,6 +4,7 @@ import {
   Text,
   TouchableOpacity,
   Modal,
+  ScrollView,
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
@@ -34,6 +35,44 @@ const LEAVE_TYPE_STYLES = {
   특별보상휴가: "#6f6e6bff",
   무급: "#6f6e6bff",
   출산: "#6f6e6bff",
+};
+
+const CATEGORY_THEME = {
+  연차: {
+    bg: "#FFFFFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+  오전반차: {
+    bg: "#FFFFFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+  오후반차: {
+    bg: "#FFFFFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+  경조사: {
+    bg: "#FFFFFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
+  기타: {
+    bg: "#FFFFFF",
+    border: "#E2E8F0",
+    text: "#0F172A",
+    sub: "#64748B",
+    accent: "#121D6D",
+  },
 };
 
 const toDateKey = (value) => {
@@ -85,8 +124,10 @@ const formatDate = (value) => {
 
 export default function Home() {
   const navigation = useNavigation();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isNarrow = width < 1024;
+  const isMobile = width < 800;
+  const cardMinHeight = Math.max(620, Math.floor(height * 0.72));
   const { version } = useContext(LeaveBalanceContext);
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [calendarLeaves, setCalendarLeaves] = useState([]);
@@ -137,11 +178,22 @@ export default function Home() {
         const done = leaveRes.data?.["요청 처리 건"] ?? [];
         const mapItem = (e) => ({
           id: e.id,
+          name: e.employee?.name ?? balanceData.name ?? balanceData.employee?.name ?? "",
+          department:
+            e.employee?.department?.name ??
+            balanceData.department ??
+            balanceData.employee?.department?.name ??
+            "",
+          position: e.employee?.level ?? balanceData.level ?? "사원",
           type: e.leaveType ?? "",
           startDate: e.startDate,
           endDate: e.endDate,
           usedDay: e.usedDay,
+          reason: e.reason ?? "",
+          etc: e.etc ?? "",
           status: e.approvalStatusDisplay ?? "",
+          approvalStatus: e.approvalStatus ?? e.approvalStatusDisplay ?? "",
+          rejectionReason: e.rejectionReason ?? "—",
         });
         setLeaveSummary({
           waiting: waiting.map(mapItem),
@@ -212,31 +264,9 @@ export default function Home() {
       .sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)))
       .slice(0, 5);
   }, [leaveSummary]);
-
-  const calendarMarks = useMemo(() => {
-    const map = new Map();
-    for (const item of calendarLeaves) {
-      const keys = getDateKeysInRange(item.startDate, item.endDate);
-      const color = LEAVE_TYPE_STYLES[item.leaveType] ?? "#94A3B8";
-      for (const key of keys) {
-        const prev = map.get(key) ?? [];
-        prev.push(color);
-        map.set(key, prev);
-      }
-    }
-    return map;
-  }, [calendarLeaves]);
-
-  const openDayEvents = (dateKey) => {
-    if (!dateKey) return;
-    const list = calendarLeaves.filter((item) => {
-      const keys = getDateKeysInRange(item.startDate, item.endDate);
-      return keys.includes(dateKey);
-    });
-    setDayEventsDateKey(dateKey);
-    setDayEvents(list);
-    setDayEventsOpen(true);
-  };
+  const recentVisibleCount = isMobile ? 3 : 5;
+  const shouldScrollRecent = recentRequests.length > recentVisibleCount;
+  const recentScrollMaxHeight = 64 * recentVisibleCount;
 
   const closeDayEvents = () => {
     setDayEventsOpen(false);
@@ -304,7 +334,7 @@ export default function Home() {
   return (
     <PageLayout
       breadcrumb={[{ label: "홈" }]}
-      contentStyle={styles.pageContent}
+      contentStyle={[styles.pageContent, isMobile && styles.pageContentMobile]}
       pageStyle={styles.pageBackground}
     >
       <View style={styles.headerRow}>
@@ -317,8 +347,22 @@ export default function Home() {
         </View>
       </View>
       
-           <View style={[styles.gridRow, isNarrow && styles.gridRowStack]}>
-        <View style={[styles.card, styles.balanceCard]}>
+           <View
+        style={[
+          styles.gridRow,
+          isNarrow && styles.gridRowStack,
+          isMobile && styles.gridRowStackMobile,
+        ]}
+      >
+        <View
+          style={[
+            styles.card,
+            styles.balanceCard,
+            !isNarrow && styles.cardStretch,
+            isMobile && styles.cardMobile,
+            !isNarrow && { minHeight: cardMinHeight },
+          ]}
+        >
           <View style={styles.cardTitleRow}>
             <View>
               <Text style={styles.cardTitle}>연차 현황</Text>
@@ -356,12 +400,23 @@ export default function Home() {
             </Text>
           </View>
 
-          <View style={styles.quickCard}>
+          <View
+            style={[
+              styles.quickCard,
+              { marginTop: 28 },
+              isMobile && styles.quickCardMobile,
+            ]}
+          >
             <Text style={styles.quickCardTitle}>바로가기</Text>
             <Text style={styles.quickCardSubtitle}>
               자주 쓰는 신청서로 빠르게 이동하세요.
             </Text>
-            <View style={styles.quickCardButtons}>
+            <View
+              style={[
+                styles.quickCardButtons,
+                isMobile && styles.quickCardButtonsMobile,
+              ]}
+            >
               <TouchableOpacity
                 style={styles.quickCardButtonPrimary}
                 onPress={() => navigation.navigate("LeaveForm")}
@@ -380,59 +435,113 @@ export default function Home() {
               </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.categoryButtons}>
-            {[
-              ["연차", "오전반차", "오후반차"],
-              ["경조사", "기타", null],
-            ].map((row, rowIndex) => (
-              <View key={`row-${rowIndex}`} style={styles.categoryRow}>
-                {row.map((type, index) =>
-                  type ? (
-                    <View key={type} style={styles.categoryButtonWrap}>
-                      <TouchableOpacity
-                        style={styles.categoryButton}
-                        onPress={() =>
-                          navigation.navigate("LeaveForm", {
-                            preselectLeaveType: type,
-                          })
-                        }
-                      >
-                        <Text style={styles.categoryButtonText}>{type}</Text>
-                        <Text style={styles.categoryButtonSubText}>
-                          사용일수 {leaveTypeUsageDays(type)}일
+          {!isMobile ? (
+            <View style={styles.categoryButtons}>
+              {(() => {
+                const renderCategoryButton = (type, { size = "md" } = {}) => {
+                  const theme = CATEGORY_THEME[type] ?? CATEGORY_THEME.기타;
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.categoryButton,
+                        size === "lg" && styles.categoryButtonLarge,
+                        { backgroundColor: theme.bg, borderColor: theme.border },
+                      ]}
+                      onPress={() =>
+                        navigation.navigate("LeaveForm", {
+                          preselectLeaveType: type,
+                        })
+                      }
+                    >
+                      <View style={styles.categoryButtonRow}>
+                        <View style={styles.categoryButtonLabel}>
+                          <Text
+                            style={[
+                              styles.categoryButtonText,
+                              size === "lg" && styles.categoryButtonTextLarge,
+                              { color: theme.text },
+                            ]}
+                          >
+                            {type}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.categoryButtonArrow,
+                            { color: theme.accent },
+                          ]}
+                        >
+                          ›
                         </Text>
-                      </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                };
+
+                return (
+                  <>
+                    <View style={styles.categoryRow}>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("연차")}
+                      </View>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("오전반차")}
+                      </View>
                     </View>
-                  ) : (
-                    <View key={`placeholder-${rowIndex}-${index}`} style={styles.categoryButtonWrap}>
-                      <View style={styles.categoryButtonPlaceholder} />
+                    <View style={styles.categoryRow}>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("오후반차")}
+                      </View>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("경조사")}
+                      </View>
                     </View>
-                  ),
-                )}
-              </View>
-            ))}
-          </View>
+                    <View style={styles.categoryRow}>
+                      <View style={styles.categoryButtonWrap}>
+                        {renderCategoryButton("기타")}
+                      </View>
+                      <View style={styles.categoryButtonWrap}>
+                        <View style={styles.categoryButtonPlaceholder} />
+                      </View>
+                    </View>
+                  </>
+                );
+              })()}
+            </View>
+          ) : null}
         </View>
 
         
 
-        <View style={[styles.card, styles.statusCard]}>
+        <View
+          style={[
+            styles.card,
+            styles.statusCard,
+            !isNarrow && styles.cardStretch,
+            isMobile && styles.cardMobile,
+            !isNarrow && { minHeight: cardMinHeight },
+          ]}
+        >
           <Text style={styles.cardTitle}>연차 진행 상황</Text>
-          <Text style={styles.cardCaption}>요청 현황 요약</Text>
-          <View style={styles.statusRow}>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusLabel}>승인 대기</Text>
-              <Text style={styles.statusValue}>
-                {loading ? "-" : leaveSummary.waiting.length}
-              </Text>
+          {!isMobile ? (
+            <Text style={styles.cardCaption}>요청 현황 요약</Text>
+          ) : null}
+          {!isMobile ? (
+            <View style={styles.statusRow}>
+              <View style={styles.statusPill}>
+                <Text style={styles.statusLabel}>승인 대기</Text>
+                <Text style={styles.statusValue}>
+                  {loading ? "-" : leaveSummary.waiting.length}
+                </Text>
+              </View>
+              <View style={styles.statusPill}>
+                <Text style={styles.statusLabel}>처리 완료</Text>
+                <Text style={styles.statusValue}>
+                  {loading ? "-" : leaveSummary.done.length}
+                </Text>
+              </View>
             </View>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusLabel}>처리 완료</Text>
-              <Text style={styles.statusValue}>
-                {loading ? "-" : leaveSummary.done.length}
-              </Text>
-            </View>
-          </View>
+          ) : null}
 
           <View style={styles.recentBlock}>
             <Text style={styles.recentTitle}>최근 신청</Text>
@@ -441,32 +550,58 @@ export default function Home() {
             ) : recentRequests.length === 0 ? (
               <Text style={styles.mutedText}>최근 신청 내역이 없습니다.</Text>
             ) : (
-              recentRequests.map((item) => {
-                const theme = STATUS_STYLE[item.status] || STATUS_STYLE["대기"];
-                return (
-                  <View key={item.id} style={styles.recentRow}>
-                    <View style={styles.recentInfo}>
-                      <Text style={styles.recentType}>{item.type || "-"}</Text>
-                      <Text style={styles.recentDate}>
-                        {formatDate(item.startDate)}
-                        {item.endDate && item.endDate !== item.startDate
-                          ? ` ~ ${formatDate(item.endDate)}`
-                          : ""}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: theme.bg },
-                      ]}
+              (() => {
+                const items = recentRequests.map((item) => {
+                  const displayStatus = item.approvalStatus || item.status || "-";
+                  const theme = STATUS_STYLE[displayStatus] || STATUS_STYLE["대기"];
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.recentRow}
+                      activeOpacity={0.7}
+                      onPress={() =>
+                        navigation.navigate("LeaveStatusContent", item)
+                      }
                     >
-                      <Text style={[styles.statusBadgeText, { color: theme.text }]}>
-                        {item.status || "-"}
-                      </Text>
-                    </View>
-                  </View>
+                      <View style={styles.recentInfo}>
+                        <Text style={styles.recentType}>{item.type || "-"}</Text>
+                        <Text style={styles.recentDate}>
+                          {formatDate(item.startDate)}
+                          {item.endDate && item.endDate !== item.startDate
+                            ? ` ~ ${formatDate(item.endDate)}`
+                            : ""}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: theme.bg },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.statusBadgeText,
+                            { color: theme.text },
+                          ]}
+                        >
+                          {displayStatus}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                });
+
+                if (!shouldScrollRecent) return items;
+
+                return (
+                  <ScrollView
+                    style={{ maxHeight: recentScrollMaxHeight }}
+                    showsVerticalScrollIndicator
+                  >
+                    {items}
+                  </ScrollView>
                 );
-              })
+              })()
             )}
           </View>
         </View>
@@ -551,6 +686,12 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     gap: 16,
   },
+  pageContentMobile: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 20,
+    gap: 12,
+  },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -601,14 +742,23 @@ const styles = StyleSheet.create({
   gridRowStack: {
     flexDirection: "column",
   },
+  gridRowStackMobile: {
+    gap: 12,
+  },
   card: {
-    flex: 1,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     padding: 20,
     gap: 12,
+  },
+  cardStretch: {
+    flex: 1,
+  },
+  cardMobile: {
+    padding: 16,
+    gap: 10,
   },
   balanceCard: {
     minWidth: 320,
@@ -647,32 +797,56 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
   },
+  categoryButtonWrapFull: {
+    width: "100%",
+  },
   categoryButton: {
     flex: 1,
     width: "100%",
-    minHeight: 72,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    minHeight: 76,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-    alignItems: "center",
+    alignItems: "stretch",
     justifyContent: "center",
-    gap: 6,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3,
+    position: "relative",
+    overflow: "hidden",
+  },
+  categoryButtonLarge: {
+    minHeight: 96,
+    paddingVertical: 18,
+  },
+  categoryButtonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  categoryButtonLabel: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   categoryButtonText: {
-    fontSize: 18,
-    color: "#0F172A",
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
   },
-  categoryButtonSubText: {
-    fontSize: 14,
-    color: "#64748B",
+  categoryButtonTextLarge: {
+    fontSize: 18,
+  },
+  categoryButtonArrow: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: -1,
   },
   categoryButtonPlaceholder: {
     flex: 1,
-    minHeight: 72,
+    minHeight: 76,
     width: "100%",
   },
   balanceNumbers: {
@@ -718,6 +892,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
     gap: 8,
   },
+  quickCardMobile: {
+    marginTop: 12,
+    padding: 12,
+  },
   quickCardTitle: {
     fontSize: 14,
     fontWeight: "600",
@@ -731,6 +909,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     flexWrap: "wrap",
+  },
+  quickCardButtonsMobile: {
+    gap: 8,
   },
   quickCardButtonPrimary: {
     backgroundColor: "#121D6D",

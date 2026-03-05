@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  useWindowDimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import api from "../api/api";
@@ -12,12 +13,15 @@ import { AuthContext } from "../context/AuthContext";
 
 export default function Sidebar({ collapsed = false, onRequestClose }) {
   const navigation = useNavigation();
-  const { setIsLoggedIn } = useContext(AuthContext) ?? {};
+  const { width } = useWindowDimensions();
+  const isMobile = width < 800;
+  const panelWidth = Math.min(260, Math.max(200, Math.floor(width * 0.72)));
+  const { isLoggedIn } = useContext(AuthContext) ?? {};
   const [authorities, setAuthorities] = useState([]);
   const [isLoggedOut, setIsLoggedOut] = useState(false);
   const [openSections, setOpenSections] = useState({
-    mypage: true,
-    leave: true,
+    mypage: false,
+    leave: false,
   });
   const panelAnim = useRef(new Animated.Value(0)).current;
 
@@ -25,6 +29,13 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
     let mounted = true;
 
     const fetchMe = async () => {
+      if (!isLoggedIn) {
+        if (!mounted) return;
+        setAuthorities([]);
+        setIsLoggedOut(true);
+        return;
+      }
+
       try {
         const res = await api.get("/employees/me");
         const data = res.data;
@@ -38,7 +49,7 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
                 if (!item) return [];
                 if (typeof item === "string") return [item];
                 return [item.authorityName, item.name, item.authority].filter(
-                  Boolean
+                  Boolean,
                 );
               })
               .map((v) => String(v).toLowerCase())
@@ -67,7 +78,7 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (collapsed) {
@@ -87,11 +98,13 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
   }, [collapsed, panelAnim]);
 
   const hasAuthority = (target) =>
-    authorities.some(
-      (auth) => auth === target || auth === `role_${target}`
-    );
+    authorities.some((auth) => auth === target || auth === `role_${target}`);
   const canSeeManager = hasAuthority("manager");
   const canSeeAdmin = hasAuthority("admin");
+  const canSeeSchedule =
+    hasAuthority("schdule_admin") ||
+    hasAuthority("schedule_admin") ||
+    hasAuthority("schedule_general");
 
   const menuSections = [
     {
@@ -100,8 +113,16 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
       items: [
         { label: "휴가 신청", route: "LeaveForm", visible: true },
         { label: "내 휴가 신청 내역", route: "LeaveStatus", visible: true },
-        { label: "휴가 결재 요청", route: "LeaveRequest", visible: canSeeManager },
-        { label: "승인된 휴가", route: "LeaveApplication", visible: canSeeAdmin },
+        {
+          label: "휴가 결재 요청",
+          route: "LeaveRequest",
+          visible: canSeeManager,
+        },
+        {
+          label: "승인된 휴가",
+          route: "LeaveApplication",
+          visible: canSeeAdmin,
+        },
       ].filter((item) => item.visible),
     },
     {
@@ -109,19 +130,36 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
       title: "연장 근로",
       items: [
         { label: "연장 근로 신청", route: "OverTimeForm", visible: true },
-        { label: "내 연장 근로 신청 내역", route: "OverTimeStatus", visible: true },
+        {
+          label: "내 연장 근로 신청 내역",
+          route: "OverTimeStatus",
+          visible: true,
+        },
         {
           label: "연장 근로 결재 요청",
           route: "OverTimeRequest",
           visible: canSeeManager,
         },
         {
-        label: "승인된 연장 근로",
-        route: "OverTimeApplication",
-        visible: canSeeAdmin,
-      },
-    ].filter((item) => item.visible),
-  },
+          label: "승인된 연장 근로",
+          route: "OverTimeApplication",
+          visible: canSeeAdmin,
+        },
+      ].filter((item) => item.visible),
+    },
+    {
+      id: "scheduling",
+      title: "일정 관리",
+      visible: canSeeSchedule,
+      items: [
+        { label: "일정 등록", route: "SchedulingForm", visible: canSeeSchedule },
+        {
+          label: "일정 관리",
+          route: "SchedulingList",
+          visible: canSeeSchedule,
+        },
+      ].filter((item) => item.visible),
+    },
     {
       id: "admin",
       title: "어드민",
@@ -129,7 +167,7 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
       items: [
         {
           label: "사용자 관리",
-          route: "Setting"
+          route: "Setting",
         },
         {
           label: "연차 현황 관리",
@@ -158,56 +196,108 @@ export default function Sidebar({ collapsed = false, onRequestClose }) {
   };
 
   return (
-    <Animated.View
+    <View
       pointerEvents={collapsed ? "none" : "auto"}
       style={[
-        styles.overlayPanel,
-        {
-          opacity: panelAnim,
-          transform: [
-            {
-              translateX: panelAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-8, 0],
-              }),
-            },
-          ],
-        },
+        styles.overlayRoot,
+        isMobile ? styles.overlayRootMobile : styles.overlayRootDesktop,
       ]}
-      onMouseLeave={() => {
-        if (!collapsed) onRequestClose?.();
-      }}
     >
-      <View style={styles.menuList}>
-        {menuSections.map((section) => (
-          <View key={section.id} style={styles.menuSection}>
-            <TouchableOpacity
-              style={styles.menuSectionHeader}
-              onPress={() => toggleSection(section.id)}
-            >
-              <Text style={styles.menuSectionTitle}>{section.title}</Text>
-              <Text style={styles.menuSectionArrow}>
-                {openSections[section.id] ? "▾" : "▸"}
-              </Text>
-            </TouchableOpacity>
-            {openSections[section.id] &&
-              section.items.map((item) => (
-                <TouchableOpacity
-                  key={item.route ?? item.label}
-                  style={styles.menuItem}
-                  onPress={() => handleMenuPress(item)}
+      {isMobile && !collapsed ? (
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.backdrop}
+          onPress={() => onRequestClose?.()}
+        />
+      ) : null}
+      <Animated.View
+        style={[
+          styles.overlayPanel,
+          isMobile && styles.overlayPanelMobile,
+          {
+            width: isMobile ? panelWidth : 240,
+            opacity: panelAnim,
+            transform: [
+              {
+                translateX: panelAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-8, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+        onMouseLeave={() => {
+          if (!collapsed && !isMobile) onRequestClose?.();
+        }}
+      >
+        <View style={styles.menuList}>
+          {menuSections.map((section) => (
+            <View key={section.id} style={styles.menuSection}>
+              <TouchableOpacity
+                style={styles.menuSectionHeader}
+                onPress={() => toggleSection(section.id)}
+              >
+                <Text
+                  style={[
+                    styles.menuSectionTitle,
+                    isMobile && styles.menuSectionTitleMobile,
+                  ]}
                 >
-                  <Text style={styles.menuItemText}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-          </View>
-        ))}
-      </View>
-    </Animated.View>
+                  {section.title}
+                </Text>
+                <Text
+                  style={[
+                    styles.menuSectionArrow,
+                    isMobile && styles.menuSectionArrowMobile,
+                  ]}
+                >
+                  {openSections[section.id] ? "▾" : "▸"}
+                </Text>
+              </TouchableOpacity>
+              {openSections[section.id] &&
+                section.items.map((item) => (
+                  <TouchableOpacity
+                    key={item.route ?? item.label}
+                    style={styles.menuItem}
+                    onPress={() => handleMenuPress(item)}
+                  >
+                    <Text
+                      style={[
+                        styles.menuItemText,
+                        isMobile && styles.menuItemTextMobile,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  overlayRoot: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 999,
+  },
+  overlayRootDesktop: {
+    width: 240,
+  },
+  overlayRootMobile: {
+    right: 0,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.25)",
+  },
   menuList: {
     gap: 6,
   },
@@ -225,9 +315,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#9ca3af",
   },
+  menuSectionTitleMobile: {
+    fontSize: 15,
+  },
   menuSectionArrow: {
     fontSize: 16,
     color: "#9ca3af",
+  },
+  menuSectionArrowMobile: {
+    fontSize: 15,
   },
   menuItem: {
     flexDirection: "column",
@@ -238,6 +334,9 @@ const styles = StyleSheet.create({
   menuItemText: {
     fontSize: 15,
     color: "#000000ff",
+  },
+  menuItemTextMobile: {
+    fontSize: 14,
   },
   overlayPanel: {
     position: "absolute",
@@ -254,6 +353,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 6, height: 0 },
     zIndex: 999,
+  },
+  overlayPanelMobile: {
+    shadowOpacity: 0.12,
   },
 
   lockOverlay: {

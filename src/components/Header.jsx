@@ -7,6 +7,8 @@ import {
   Modal,
   Alert,
   Animated,
+  StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { useEffect, useContext, useState, useRef } from "react";
 import Logo from "../../assets/logo/logo.png";
@@ -16,7 +18,10 @@ import api, { getTokenExpiryMs } from "../api/api";
 import { navigate as navigateRoot } from "../navigation/RootNavigation";
 
 export default function Header({ onToggleSidebar }) {
-  const HEADER_HEIGHT = 70;
+  const { width } = useWindowDimensions();
+  const isTablet = width < 1100;
+  const isMobile = width < 800;
+  const HEADER_HEIGHT = isMobile ? 60 : 70;
   const navigation = useNavigation();
   const { isLoggedIn, setIsLoggedIn } = useContext(AuthContext);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -132,11 +137,16 @@ export default function Header({ onToggleSidebar }) {
     };
   }, [isLoggedIn]);
 
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMenu(null);
+    }
+  }, [isMobile]);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
 
-    window.location.replace("/");
     setIsLoggedIn(false);
   };
 
@@ -146,7 +156,7 @@ export default function Header({ onToggleSidebar }) {
 
   const goSchedule = () => {
     navigation.navigate("Schedule");
-  }
+  };
 
   const goLogin = () => {
     navigateRoot("Login");
@@ -154,7 +164,9 @@ export default function Header({ onToggleSidebar }) {
   };
 
   const normalizeAuthority = (value) => {
-    const raw = String(value ?? "").trim().toLowerCase();
+    const raw = String(value ?? "")
+      .trim()
+      .toLowerCase();
     if (raw === "관리자") return "admin";
     if (raw === "결재자") return "manager";
     if (raw === "일반") return "general";
@@ -169,6 +181,10 @@ export default function Header({ onToggleSidebar }) {
   };
   const canSeeManager = hasAuthority("manager");
   const canSeeAdmin = hasAuthority("admin");
+  const canSeeSchedule =
+    hasAuthority("schdule_admin") ||
+    hasAuthority("schedule_admin") ||
+    hasAuthority("schedule_general");
 
   const menuSections = [
     {
@@ -212,6 +228,19 @@ export default function Header({ onToggleSidebar }) {
       ].filter((item) => item.visible),
     },
     {
+      id: "scheduling",
+      title: "일정 관리",
+      visible: canSeeSchedule,
+      items: [
+        { label: "일정 등록", route: "SchedulingForm", visible: canSeeSchedule },
+        {
+          label: "일정 관리",
+          route: "SchedulingList",
+          visible: canSeeSchedule,
+        },
+      ].filter((item) => item.visible),
+    },
+    {
       id: "admin",
       title: "어드민",
       visible: canSeeAdmin,
@@ -232,9 +261,11 @@ export default function Header({ onToggleSidebar }) {
     },
   ].filter((section) => section.visible !== false);
 
-  const handleTitlePress = (id) => {
-    setOpenMenu(id);
-    navigation.navigate("Form");
+  const handleTitlePress = (section) => {
+    const target = section?.items?.find((item) => item?.route);
+    if (!target?.route) return;
+    setOpenMenu(null);
+    navigation.navigate(target.route);
   };
 
   const cancelClose = () => {
@@ -260,7 +291,7 @@ export default function Header({ onToggleSidebar }) {
 
   const userMenuItems = [
     { label: "홈", route: "Home" },
-    { label: "비밀번호 재설정", route: "PasswordChange" },
+    { label: "비밀번호 변경", route: "PasswordChange" },
     { label: "로그아웃", action: handleLogout },
   ];
 
@@ -325,124 +356,112 @@ export default function Header({ onToggleSidebar }) {
   };
 
   return (
-    <View
-      style={{
-        height: 70,
-        flexDirection: "row",
-        alignItems: "center",
-        borderBottomWidth: 1,
-        borderColor: "#E2E8F0",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 30 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 25 }}>
-          <TouchableOpacity onPress={onToggleSidebar} style={{ padding: 3 }}>
-            <Text style={{ fontSize: 24, color: "#0F172A" }}>☰</Text>
+    <View style={[styles.header, isMobile && styles.headerMobile]}>
+      <View
+        style={[styles.leftGroup, isTablet && styles.leftGroupTablet]}
+      >
+        <View
+          style={[styles.brandGroup, isTablet && styles.brandGroupTablet]}
+        >
+          <TouchableOpacity onPress={onToggleSidebar} style={styles.menuButton}>
+            <Text style={[styles.menuIcon, isMobile && styles.menuIconMobile]}>
+              ☰
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={goHome}>
             <Image
               source={Logo}
-              style={{ width: 190, height: 70, resizeMode: "contain" }}
+              style={[
+                styles.logo,
+                isTablet && styles.logoTablet,
+                isMobile && styles.logoMobile,
+              ]}
             />
           </TouchableOpacity>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {menuSections.map((section) => (
-            <View
-              key={section.id}
-              style={{ position: "relative" }}
-              onMouseEnter={() => {
-                cancelClose();
-                setOpenMenu(section.id);
-              }}
-              onMouseLeave={scheduleClose}
-            >
-              <TouchableOpacity
-                onPress={() => handleTitlePress(section.id)}
-                style={{
-                  height: HEADER_HEIGHT,
-                  width: 160,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor:
-                    openMenu === section.id ? "#121D6D" : "transparent",
+        {!isMobile ? (
+          <View style={styles.navRow}>
+            {menuSections.map((section) => (
+              <View
+                key={section.id}
+                style={styles.navItemWrapper}
+                onMouseEnter={() => {
+                  cancelClose();
+                  setOpenMenu(section.id);
                 }}
+                onMouseLeave={scheduleClose}
               >
-                <Text
-                  style={{
-                    fontSize: 16,
-                    color: openMenu === section.id ? "white" : "#0F172A",
-                  }}
+                <TouchableOpacity
+                  onPress={() => handleTitlePress(section)}
+                  style={[
+                    styles.navItem,
+                    isTablet && styles.navItemTablet,
+                    { height: HEADER_HEIGHT },
+                    openMenu === section.id && styles.navItemActive,
+                  ]}
                 >
-                  {section.title}
-                </Text>
-              </TouchableOpacity>
-              {openMenu === section.id ? (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: HEADER_HEIGHT,
-                    left: 0,
-                    right: 0,
-                    alignItems: "center",
-                    zIndex: 9999,
-                    elevation: 9999,
-                  }}
-                  onMouseEnter={cancelClose}
-                  onMouseLeave={scheduleClose}
-                >
-                  <Animated.View
-                    style={{
-                      width: 160,
-                      backgroundColor: "white",
-                      borderWidth: 1,
-                      borderTopWidth: 0,
-                      borderColor: "#E5E7EB",
-                      paddingVertical: 15,
-                      shadowColor: "#0F172A",
-                      shadowOpacity: 0.08,
-                      shadowRadius: 8,
-                      alignItems: "center",
-                      shadowOffset: { width: 0, height: 6 },
-                      transform: [
-                        {
-                          translateY: dropdownAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-6, 0],
-                          }),
-                        },
-                        {
-                          scaleY: dropdownAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0.98, 1],
-                          }),
-                        },
-                      ],
-                      opacity: dropdownAnim,
-                    }}
+                  <Text
+                    style={[
+                      styles.navItemText,
+                      openMenu === section.id && styles.navItemTextActive,
+                    ]}
                   >
-                    {section.items.map((item) => (
-                      <TouchableOpacity
-                        key={`${section.id}-${item.label}`}
-                        onPress={() => handleMenuPress(item)}
-                        style={{ paddingVertical: 10, paddingHorizontal: 12 }}
-                      >
-                        <Text style={{ fontSize: 14, color: "#0F172A" }}>
-                          {item.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </Animated.View>
-                </View>
-              ) : null}
-            </View>
-          ))}
-        </View>
+                    {section.title}
+                  </Text>
+                </TouchableOpacity>
+                {openMenu === section.id ? (
+                  <View
+                    style={[
+                      styles.dropdownWrap,
+                      { top: HEADER_HEIGHT },
+                    ]}
+                    onMouseEnter={cancelClose}
+                    onMouseLeave={scheduleClose}
+                  >
+                    <Animated.View
+                      style={[
+                        styles.dropdownPanel,
+                        isTablet && styles.dropdownPanelTablet,
+                        {
+                          transform: [
+                            {
+                              translateY: dropdownAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [-6, 0],
+                              }),
+                            },
+                            {
+                              scaleY: dropdownAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [0.98, 1],
+                              }),
+                            },
+                          ],
+                          opacity: dropdownAnim,
+                        },
+                      ]}
+                    >
+                      {section.items.map((item) => (
+                        <TouchableOpacity
+                          key={`${section.id}-${item.label}`}
+                          onPress={() => handleMenuPress(item)}
+                          style={styles.dropdownItem}
+                        >
+                          <Text style={styles.dropdownItemText}>
+                            {item.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </Animated.View>
+                  </View>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <View style={[styles.rightGroup, isMobile && styles.rightGroupMobile]}>
         {/* {isLoggedIn && tokenRemainingText ? (
           <View
             style={{
@@ -463,13 +482,12 @@ export default function Header({ onToggleSidebar }) {
           <View style={{ position: "relative" }}>
             <TouchableOpacity onPress={() => setOpenUserMenu((prev) => !prev)}>
               <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: "400",
-                  color: "black",
-                }}
+                style={[
+                  styles.userText,
+                  isMobile && styles.userTextMobile,
+                ]}
               >
-                {`${userName || ""}님`} 
+                {`${userName || ""}님`}
               </Text>
             </TouchableOpacity>
             {openUserMenu ? (
@@ -534,21 +552,20 @@ export default function Header({ onToggleSidebar }) {
 
         <TouchableOpacity
           onPress={isLoggedIn ? goSchedule : goLogin}
-          style={{
-            backgroundColor: isLoggedIn ? "#ffffff" : "#121D6D",
-            borderColor: isLoggedIn ? "#000000ff" : "#121D6D",
-            borderWidth: 1,
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            borderRadius: 8,
-          }}
+          style={[
+            styles.actionButton,
+            isLoggedIn ? styles.actionButtonGhost : styles.actionButtonPrimary,
+            isMobile && styles.actionButtonMobile,
+          ]}
         >
           <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "400",
-              color: isLoggedIn ? "#0F172A" : "white",
-            }}
+            style={[
+              styles.actionButtonText,
+              isLoggedIn
+                ? styles.actionButtonTextGhost
+                : styles.actionButtonTextPrimary,
+              isMobile && styles.actionButtonTextMobile,
+            ]}
           >
             {isLoggedIn ? "일정보러 가기" : "로그인"}
           </Text>
@@ -682,3 +699,167 @@ export default function Header({ onToggleSidebar }) {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    height: 70,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderColor: "#E2E8F0",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+  },
+  headerMobile: {
+    height: 60,
+    paddingHorizontal: 12,
+  },
+  leftGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 30,
+    flex: 1,
+  },
+  leftGroupTablet: {
+    gap: 16,
+  },
+  brandGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 25,
+  },
+  brandGroupTablet: {
+    gap: 12,
+  },
+  menuButton: {
+    padding: 3,
+  },
+  menuIcon: {
+    fontSize: 24,
+    color: "#0F172A",
+  },
+  menuIconMobile: {
+    fontSize: 22,
+  },
+  logo: {
+    width: 190,
+    height: 70,
+    resizeMode: "contain",
+  },
+  logoTablet: {
+    width: 150,
+    height: 60,
+  },
+  logoMobile: {
+    width: 120,
+    height: 50,
+  },
+  navRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  navItemWrapper: {
+    position: "relative",
+  },
+  navItem: {
+    width: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  navItemTablet: {
+    width: 130,
+  },
+  navItemActive: {
+    backgroundColor: "#121D6D",
+  },
+  navItemText: {
+    fontSize: 16,
+    color: "#0F172A",
+  },
+  navItemTextActive: {
+    color: "#FFFFFF",
+  },
+  dropdownWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  dropdownPanel: {
+    width: 160,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: "#E5E7EB",
+    paddingVertical: 15,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    alignItems: "center",
+    shadowOffset: { width: 0, height: 6 },
+  },
+  dropdownPanelTablet: {
+    width: 130,
+  },
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#0F172A",
+  },
+  rightGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  rightGroupMobile: {
+    gap: 8,
+  },
+  userText: {
+    fontSize: 16,
+    fontWeight: "400",
+    color: "black",
+  },
+  userTextMobile: {
+    fontSize: 14,
+  },
+  actionButton: {
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: "center",
+  },
+  actionButtonMobile: {
+    minWidth: 96,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  actionButtonPrimary: {
+    backgroundColor: "#121D6D",
+    borderColor: "#121D6D",
+  },
+  actionButtonGhost: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E2E8F0",
+  },
+  actionButtonText: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  actionButtonTextMobile: {
+    fontSize: 13,
+  },
+  actionButtonTextPrimary: {
+    color: "white",
+  },
+  actionButtonTextGhost: {
+    color: "#0F172A",
+  },
+});

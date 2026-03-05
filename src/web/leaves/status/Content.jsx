@@ -149,6 +149,7 @@ export default function StatusDetail({ route }) {
     reason = "",
     etc = "",
     status = "",
+    approvalStatus = "",
     rejectionReason = "—",
   } = params;
 
@@ -158,7 +159,7 @@ export default function StatusDetail({ route }) {
   );
 
   const remainDays = `${usedDay}일`;
-  const isPending = status === "대기";
+  const displayStatus = approvalStatus || status || "대기";
   const displayType = type
     ? ["연차", "오전반차", "오후반차"].includes(type)
       ? type
@@ -233,7 +234,7 @@ export default function StatusDetail({ route }) {
     };
   }, [startDate, endDate]);
 
-  const statusTheme = STATUS_STYLE[status] || STATUS_STYLE["대기"];
+  const statusTheme = STATUS_STYLE[displayStatus] || STATUS_STYLE["대기"];
   const currentYear = new Date().getFullYear();
   const requestYear = getYearFromDate(startDate) ?? currentYear;
   const isCurrentYear = requestYear === currentYear;
@@ -258,7 +259,7 @@ export default function StatusDetail({ route }) {
             <View style={[styles.statusPill, { backgroundColor: statusTheme.bg }]}>
               <View style={[styles.statusDot, { backgroundColor: statusTheme.dot }]} />
               <Text style={[styles.statusText, { color: statusTheme.text }]}>
-                {status || "대기"}
+                {displayStatus}
               </Text>
             </View>
           </View>
@@ -266,7 +267,7 @@ export default function StatusDetail({ route }) {
           <View style={styles.sectionDivider} />
 
           <View style={styles.table}>
-            <InfoRow label="상태" value={status || "대기"} />
+            <InfoRow label="상태" value={displayStatus} />
             <InfoRow label="휴가 형태" value={displayType} />
             <InfoRow label="기간" value={useDate || "-"} />
             <InfoRow label="사용일수" value={remainDays} />
@@ -311,11 +312,6 @@ export default function StatusDetail({ route }) {
               <Text style={styles.sectionTitle}>거절 사유</Text>
               <Text style={styles.sectionSub}>반려 시 사유가 표시됩니다.</Text>
             </View>
-            {isPending && (
-              <View style={styles.pendingPill}>
-                <Text style={styles.pendingText}>대기중</Text>
-              </View>
-            )}
           </View>
           <View style={styles.sectionDivider} />
           <Text style={styles.messageText}>
@@ -446,15 +442,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  pendingPill: {
-    paddingHorizontal: 10,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#FEF3C7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pendingText: { fontSize: 12, fontWeight: "600", color: "#B45309" },
   messageText: { fontSize: 14, color: "#DC2626", lineHeight: 20 },
   backButton: {
     alignSelf: "center",

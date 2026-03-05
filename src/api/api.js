@@ -4,6 +4,7 @@ import { Alert } from "react-native";
 
 const isWeb = typeof window !== "undefined";
 const BASE_URL = "https://schedule.stkkr.com/";
+// const BASE_URL = "http://localhost:8080/";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -189,11 +190,16 @@ api.interceptors.response.use(
     const originalRequest = config || {};
     const errorCode = response?.data?.code;
     const status = response?.status;
-    const msg = response?.data?.msg;
+    const msg = response?.data?.message;
+    const getErrorMessage = (err, fallback) =>
+      err?.response?.data?.message || fallback;
+    const fallbackMsg =
+      "서버 오류가 발생했습니다. IT/ISO 부서로 문의해주시길 바랍니다.";
+    const allowFallback = status >= 500;
 
     if (status === 401 && errorCode === "REFRESH_TOKEN_EXPIRED") {
       await forceLogout();
-      showErrorAlert(msg);
+      showErrorAlert(msg || "로그인이 필요합니다.");
       return Promise.reject(error);
     }
 
@@ -214,12 +220,17 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        showErrorAlert(msg);
+        showErrorAlert(getErrorMessage(refreshError, "로그인이 필요합니다."));
         return Promise.reject(refreshError);
       }
     }
 
-    showErrorAlert(msg);
+    if (status === 401) {
+      showErrorAlert(msg || "로그인이 필요합니다.");
+      return Promise.reject(error);
+    }
+
+    showErrorAlert(msg || (allowFallback ? fallbackMsg : null));
     return Promise.reject(error);
   }
 );

@@ -4,6 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Image,
+  Modal,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import PageLayout from "../../../components/PageLayout";
@@ -18,6 +20,8 @@ const STATUS_STYLE = {
 export default function StatusDetail({ route }) {
   const navigation = useNavigation();
   const params = route?.params ?? {};
+  const [previewModalOpen, setPreviewModalOpen] = React.useState(false);
+  const [previewImageUri, setPreviewImageUri] = React.useState("");
 
   const {
     name = "",
@@ -29,15 +33,27 @@ export default function StatusDetail({ route }) {
     requestDate = "",
     startTime = "",
     endTime = "",
+    imageUrl = "",
     status = "",
+    approvalStatus = "",
     rejectionReason = "—",
   } = params;
 
-  const isPending = status === "대기";
+  const displayStatus = approvalStatus || status || "대기";
 
-  const statusTheme = STATUS_STYLE[status] || STATUS_STYLE["대기"];
+  const statusTheme = STATUS_STYLE[displayStatus] || STATUS_STYLE["대기"];
   const timeRange =
     startTime || endTime ? `${startTime || "-"} ~ ${endTime || "-"}` : "-";
+  const hasImage = Boolean(imageUrl);
+  const openPreviewModal = () => {
+    if (!imageUrl) return;
+    setPreviewImageUri(imageUrl);
+    setPreviewModalOpen(true);
+  };
+  const closePreviewModal = () => {
+    setPreviewModalOpen(false);
+    setPreviewImageUri("");
+  };
 
   return (
     <PageLayout
@@ -59,7 +75,7 @@ export default function StatusDetail({ route }) {
             <View style={[styles.statusPill, { backgroundColor: statusTheme.bg }]}>
               <View style={[styles.statusDot, { backgroundColor: statusTheme.dot }]} />
               <Text style={[styles.statusText, { color: statusTheme.text }]}>
-                {status || "대기"}
+                {displayStatus}
               </Text>
             </View>
           </View>
@@ -67,13 +83,33 @@ export default function StatusDetail({ route }) {
           <View style={styles.sectionDivider} />
 
           <View style={styles.table}>
-            <InfoRow label="상태" value={status || "대기"} />
+            <InfoRow label="상태" value={displayStatus} />
             <InfoRow label="작업번호" value={jobNumber || "-"} />
             <InfoRow label="호선명" value={vesselName || "-"} />
             <InfoRow label="호선번호" value={hullNo || "-"} />
             <InfoRow label="요청일자" value={requestDate || "-"} />
             <InfoRow label="작업시간" value={timeRange} />
             <InfoRow label="작업내용" value={jobDescription || "-"} multiline />
+            <View style={styles.tableRow}>
+              <View style={styles.tableLabelCell}>
+                <Text style={styles.tableLabel}>이미지</Text>
+              </View>
+              <View style={styles.tableValueCell}>
+                {hasImage ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={openPreviewModal}
+                  >
+                    <Image
+                      source={{ uri: imageUrl }}
+                      style={styles.previewImage}
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.tableValueEmpty}>첨부파일 없음</Text>
+                )}
+              </View>
+            </View>
             <InfoRow label="소속" value={department || "-"} />
             <InfoRow label="성명" value={name || "-"} isLast />
           </View>
@@ -85,11 +121,6 @@ export default function StatusDetail({ route }) {
               <Text style={styles.sectionTitle}>거절 사유</Text>
               <Text style={styles.sectionSub}>반려 시 사유가 표시됩니다.</Text>
             </View>
-            {isPending && (
-              <View style={styles.pendingPill}>
-                <Text style={styles.pendingText}>대기중</Text>
-              </View>
-            )}
           </View>
           <View style={styles.sectionDivider} />
           <Text style={styles.messageText}>
@@ -101,6 +132,36 @@ export default function StatusDetail({ route }) {
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Text style={styles.backButtonText}>뒤로</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={previewModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={closePreviewModal}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={closePreviewModal}
+          style={styles.previewModalOverlay}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => {}}
+            style={styles.previewModalBox}
+          >
+            {!!previewImageUri && (
+              <Image
+                source={{ uri: previewImageUri }}
+                style={styles.previewModalImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity onPress={closePreviewModal}>
+              <Text style={styles.previewModalCloseText}>닫기</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </PageLayout>
   );
 }
@@ -133,7 +194,7 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 5,
     padding: 20,
     borderWidth: 1,
     borderColor: "#E2E8F0",
@@ -205,20 +266,46 @@ const styles = StyleSheet.create({
   tableLabel: { fontSize: 12, fontWeight: "600", color: "#475569" },
   tableValue: { fontSize: 14, color: "#0F172A", lineHeight: 20 },
   tableValueMultiline: { lineHeight: 20 },
+  tableValueEmpty: { fontSize: 14, color: "#94A3B8", lineHeight: 20 },
+  previewImage: {
+    width: 160,
+    height: 120,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+  },
+  previewModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  previewModalBox: {
+    width: "100%",
+    maxWidth: 900,
+    maxHeight: "90%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    gap: 12,
+  },
+  previewModalImage: {
+    width: "100%",
+    height: 480,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+  },
+  previewModalCloseText: {
+    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   messageHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  pendingPill: {
-    paddingHorizontal: 10,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#FEF3C7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pendingText: { fontSize: 12, fontWeight: "600", color: "#B45309" },
   messageText: { fontSize: 14, color: "#DC2626", lineHeight: 20 },
   backButton: {
     alignSelf: "center",

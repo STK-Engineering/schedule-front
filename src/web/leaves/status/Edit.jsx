@@ -331,8 +331,7 @@ export default function Edit() {
     leaveType &&
     startDate &&
     endDate &&
-    reason.trim().length > 0 &&
-    etc.trim().length > 0;
+    reason.trim().length > 0;
 
   const previewPeriod = useMemo(
     () => formatPeriodByUsedDays(startDate, endDate, holidayDateSet),
@@ -393,7 +392,7 @@ export default function Edit() {
     try {
       const endpoint =
         leaveType === "경조사" && reason.startsWith("출산")
-          ? `/spouse-maternity/${id}`
+          ? `/paternity-leave/${id}`
           : `/leaves/${id}`;
       await api.put(endpoint, payload);
       bump();

@@ -474,7 +474,7 @@ export default function Form() {
                   isMobile && styles.fieldItemMobile,
                 ]}
               >
-                <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+                <Text style={[styles.fieldLabel]}>
                   * 휴가 유형
                 </Text>
                 <View style={[styles.leaveTypeRow, isMobile && styles.leaveTypeRowMobile]}>
@@ -514,7 +514,7 @@ export default function Form() {
             <View style={[styles.fieldRow, isMobile && styles.fieldRowMobile]}>
               {isHalfDay || isHealthCheck ? (
                 <View style={[styles.fieldItem, isMobile && styles.fieldItemMobile]}>
-                  <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+                  <Text style={styles.fieldLabel}>
                     * 요청일자
                   </Text>
                   <input
@@ -530,7 +530,7 @@ export default function Form() {
               ) : (
                 <>
                   <View style={[styles.fieldItem, isMobile && styles.fieldItemMobile]}>
-                    <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+                    <Text style={styles.fieldLabel}>
                       * 시작일
                     </Text>
                     <input
@@ -541,7 +541,7 @@ export default function Form() {
                     />
                   </View>
                   <View style={[styles.fieldItem, isMobile && styles.fieldItemMobile]}>
-                    <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+                    <Text style={styles.fieldLabel}>
                       * 종료일
                     </Text>
                     <input
@@ -558,7 +558,7 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+            <Text style={styles.fieldLabel}>
               * 사유
             </Text>
             {leaveType === "경조사" || leaveType === "기타" ? (
@@ -621,7 +621,7 @@ export default function Form() {
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={[styles.fieldLabel, isMobile && styles.fieldLabelMobile]}>
+            <Text style={styles.fieldLabel}>
               기타 사항
             </Text>
             <TextInput
@@ -694,34 +694,6 @@ export default function Form() {
             />
             <PreviewRow label="사유" value={reason || "-"} />
             <PreviewRow label="기타 사항" value={etc || "-"} multiline />
-            {leaveType !== "경조사" && leaveType !== "기타" && (
-              <>
-                <PreviewRow
-                  label="총 휴가 일수"
-                  value={
-                    isCurrentYear
-                      ? balancesLoading
-                        ? "-"
-                        : `${balances.totalDays}일`
-                      : "당해연도건만 확인할 수 있습니다."
-                  }
-                  valueStyle={!isCurrentYear ? styles.balanceNotice : undefined}
-                  multiline={!isCurrentYear}
-                />
-                <PreviewRow
-                  label="잔여 일수"
-                  value={
-                    isCurrentYear
-                      ? balancesLoading
-                        ? "-"
-                        : `${balances.remainingDays}일`
-                      : "당해연도건만 확인할 수 있습니다."
-                  }
-                  valueStyle={!isCurrentYear ? styles.balanceNotice : undefined}
-                  multiline={!isCurrentYear}
-                />
-              </>
-            )}
           </View>
         </View>
 
@@ -962,11 +934,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 12,
-    color: "#64748B",
     marginBottom: 8,
-  },
-  fieldLabelMobile: {
-    fontSize: 11,
   },
   input: {
     paddingVertical: 11,

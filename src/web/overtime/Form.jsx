@@ -977,7 +977,6 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 12,
-    color: "#64748B",
     marginBottom: 8,
   },
   actionRow: {

@@ -39,35 +39,35 @@ const LEAVE_TYPE_STYLES = {
 
 const CATEGORY_THEME = {
   연차: {
-    bg: "#F8FAFF",
+    bg: "#FFFFFF",
     border: "#E2E8F0",
     text: "#0F172A",
     sub: "#64748B",
     accent: "#121D6D",
   },
   오전반차: {
-    bg: "#F8FAFF",
+    bg: "#FFFFFF",
     border: "#E2E8F0",
     text: "#0F172A",
     sub: "#64748B",
     accent: "#121D6D",
   },
   오후반차: {
-    bg: "#F8FAFF",
+    bg: "#FFFFFF",
     border: "#E2E8F0",
     text: "#0F172A",
     sub: "#64748B",
     accent: "#121D6D",
   },
   경조사: {
-    bg: "#F8FAFF",
+    bg: "#FFFFFF",
     border: "#E2E8F0",
     text: "#0F172A",
     sub: "#64748B",
     accent: "#121D6D",
   },
   기타: {
-    bg: "#F8FAFF",
+    bg: "#FFFFFF",
     border: "#E2E8F0",
     text: "#0F172A",
     sub: "#64748B",
